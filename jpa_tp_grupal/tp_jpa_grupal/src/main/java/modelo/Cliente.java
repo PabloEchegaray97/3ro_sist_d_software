@@ -15,12 +15,12 @@ public class Cliente extends AuditoriaApp {
     private String denominacion;
 
     // TODO: Configurar @OneToOne y @JoinColumn (nullable = false)
-    @OneToOne
+    @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(nullable = false)
     private Contacto contacto;
 
     // TODO: Configurar @OneToOne y @JoinColumn(nullable = false)
-    @OneToOne
+    @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(nullable = false)
     private Domicilio domicilio;
 

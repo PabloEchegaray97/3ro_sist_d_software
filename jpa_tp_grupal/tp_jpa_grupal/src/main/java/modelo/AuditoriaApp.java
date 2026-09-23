@@ -21,16 +21,16 @@ public abstract class AuditoriaApp extends EntityId {
     protected Date fechaModificacion;
 
     // TODO: Configurar @ManyToOne y @JoinColumn(nullable = false)
-    @ManyToOne
+    @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(nullable = false)
     protected Usuario usuarioCarga;
 
     // TODO: Configurar @ManyToOne
-    @ManyToOne
+    @ManyToOne(cascade = CascadeType.ALL)
     protected Usuario usuarioBaja;
 
     // TODO: Configurar @ManyToOne y @JoinColumn(nullable = false)
-    @ManyToOne
+    @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(nullable = false)
     protected Usuario usuarioModificacion;
 

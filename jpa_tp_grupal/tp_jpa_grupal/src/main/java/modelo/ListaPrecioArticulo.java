@@ -8,7 +8,7 @@ import jakarta.persistence.*;
 public class ListaPrecioArticulo extends AuditoriaApp {
 
     // TODO: Configurar @ManyToOne y @JoinColumn(nullable = false)
-    @ManyToOne
+    @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(nullable = false)
     private ListaPrecio listaPrecio;
 
@@ -17,7 +17,7 @@ public class ListaPrecioArticulo extends AuditoriaApp {
     private double precioVenta;
 
     // TODO: Configurar @ManyToOne y @JoinColumn(nullable = false)
-    @ManyToOne
+    @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(nullable = false)
     private Articulo articulo;
 

@@ -8,7 +8,7 @@ import jakarta.persistence.*;
 public class Articulo extends AuditoriaApp {
 
     // TODO: Configurar @ManyToOne
-    @ManyToOne
+    @ManyToOne(cascade = CascadeType.ALL)
     private Rubro rubro;
 
     // TODO: Configurar @Column(nullable = false) en codigo y denominacion
@@ -19,7 +19,7 @@ public class Articulo extends AuditoriaApp {
     private String denominacion;
 
     // TODO: Configurar @ManyToOne
-    @ManyToOne
+    @ManyToOne(cascade = CascadeType.ALL)
     private Marca marca;
 
     public Rubro getRubro() {

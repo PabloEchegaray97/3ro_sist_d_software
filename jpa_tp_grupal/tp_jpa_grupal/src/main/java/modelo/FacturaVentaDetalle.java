@@ -14,7 +14,7 @@ public class FacturaVentaDetalle extends EntityId {
 
     // TODO: Configurar @ManyToOne y @JoinColumn(nullable = false)
 
-    @ManyToOne
+    @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(nullable = false)
     private ListaPrecioArticulo listaPrecioArticulo;
 

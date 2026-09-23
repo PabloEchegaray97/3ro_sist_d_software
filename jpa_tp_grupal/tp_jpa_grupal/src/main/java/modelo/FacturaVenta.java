@@ -11,13 +11,21 @@ public class FacturaVenta extends AuditoriaApp {
 
     private Long numero;
 
+    @ManyToOne(cascade = CascadeType.ALL)
+    @JoinColumn(nullable = false)
+    private Cliente cliente;
+
+    @ManyToOne(cascade = CascadeType.ALL)
+    @JoinColumn(nullable = false)
+    private TipoMoneda tipoMoneda;
+
     // TODO: Configurar @Column(nullable = false)
     @Column(nullable = false)
     @Temporal(TemporalType.DATE)
     private Date fechaEmision;
 
     // TODO: Configurar @ManyToOne y @JoinColumn(nullable = false)
-    @ManyToOne
+    @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(nullable = false)
     private PuntoVenta puntoVenta;
 
@@ -59,6 +67,14 @@ public class FacturaVenta extends AuditoriaApp {
 
     public PuntoVenta getPuntoVenta() {
         return puntoVenta;
+    }
+
+    public Cliente getCliente() {
+        return cliente;
+    }
+
+    public TipoMoneda getTipoMoneda() {
+        return tipoMoneda;
     }
 
     public double getImporteCobrado() {
@@ -115,6 +131,14 @@ public class FacturaVenta extends AuditoriaApp {
 
     public void setPuntoVenta(PuntoVenta puntoVenta) {
         this.puntoVenta = puntoVenta;
+    }
+
+    public void setCliente(Cliente cliente) {
+        this.cliente = cliente;
+    }
+
+    public void setTipoMoneda(TipoMoneda tipoMoneda) {
+        this.tipoMoneda = tipoMoneda;
     }
 
     public void setImporteCobrado(double importeCobrado) {
