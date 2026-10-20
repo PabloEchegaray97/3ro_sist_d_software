@@ -1,0 +1,333 @@
+{
+  "info": {
+    "_postman_id": "1329ac26-923d-4557-a554-aa875622e616",
+    "name": "TP Spring Boot - Facturas MariaDB",
+    "description": "Colección guiada para preparar los datos maestros, crear facturas, consultar el DTO FacturaReporteDTO y descargar PDF/XLSX. Ejecutar las carpetas en orden sobre una base tp_spring_boot vacía. Cada alta guarda automáticamente su ID como variable de colección.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "usuarioId", "value": "" },
+    { "key": "condicionIvaId", "value": "" },
+    { "key": "tipoMonedaId", "value": "" },
+    { "key": "puntoVentaId", "value": "" },
+    { "key": "clienteId", "value": "" },
+    { "key": "rubroId", "value": "" },
+    { "key": "marcaId", "value": "" },
+    { "key": "listaPrecioId", "value": "" },
+    { "key": "articuloId", "value": "" },
+    { "key": "listaPrecioArticuloId", "value": "" },
+    { "key": "facturaId", "value": "" },
+    { "key": "fechaDesde", "value": "2026-01-01" },
+    { "key": "fechaHasta", "value": "2026-12-31" },
+    { "key": "estado", "value": "EMITIDA" },
+    { "key": "montoMinimo", "value": "1000" }
+  ],
+  "item": [
+    {
+      "name": "00 - Preparar datos maestros (ejecutar en orden)",
+      "description": "Estos datos son obligatorios por las relaciones JPA de FacturaVenta. Ejecutá esta carpeta una sola vez y en el orden indicado. Cada request guarda el ID creado para que el siguiente lo use automáticamente.",
+      "item": [
+        {
+          "name": "01 - Crear usuario de auditoría",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"usuario\": \"admin\",\n  \"clave\": \"1234\",\n  \"nombre\": \"Usuario\",\n  \"apellido\": \"Administrador\"\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/usuarios",
+            "description": "Crea el usuario que completa usuarioCarga y usuarioModificacion en las entidades auditadas. Al responder guarda su id en {{usuarioId}}. La clave es sólo un dato académico del modelo; esta API no implementa autenticación."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Usuario creado: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('usuarioId', body.id);",
+            "pm.test('Se guardó usuarioId', () => pm.expect(body.id).to.be.a('number'));"
+          ] } }]
+        },
+        {
+          "name": "02 - Crear condición de IVA",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"codigoAfip\": 1,\n  \"denominacion\": \"IVA Responsable Inscripto\",\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/condiciones-iva",
+            "description": "Crea la condición fiscal que aparecerá en condicionIva del reporte. Usa el usuario anterior para auditoría y guarda el resultado en {{condicionIvaId}}."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Condición IVA creada: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('condicionIvaId', body.id);"
+          ] } }]
+        },
+        {
+          "name": "03 - Crear tipo de moneda",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"codigoAfip\": \"PES\",\n  \"denominacion\": \"Peso Argentino\",\n  \"simbolo\": \"$\",\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/tipos-moneda",
+            "description": "Crea la moneda obligatoria de la factura. Guarda el ID en {{tipoMonedaId}}."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Moneda creada: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('tipoMonedaId', body.id);"
+          ] } }]
+        },
+        {
+          "name": "04 - Crear punto de venta",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1,\n  \"descripcion\": \"Sucursal Central\",\n  \"tipoEmision\": \"ONLINE\",\n  \"domicilioComercial\": \"Mendoza\",\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/puntos-venta",
+            "description": "Crea el punto desde el cual se emite la factura. Su descripción aparece en el reporte. Guarda el ID en {{puntoVentaId}}."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Punto de venta creado: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('puntoVentaId', body.id);"
+          ] } }]
+        },
+        {
+          "name": "05 - Crear cliente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"cuitCuil\": \"30-12345678-9\",\n  \"denominacion\": \"Empresa Tech S.A.\",\n  \"email\": \"contacto@empresa-tech.com\",\n  \"telefono\": \"2614000000\",\n  \"celular\": \"2615000000\",\n  \"nombreCalle\": \"San Martin\",\n  \"numeroCalle\": \"100\",\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/clientes",
+            "description": "Crea cliente, contacto y domicilio en una sola operación. Guarda el ID en {{clienteId}}. En una factura puede enviarse clienteId null para obtener Consumidor Final."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Cliente creado: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('clienteId', body.id);"
+          ] } }]
+        },
+        {
+          "name": "06 - Crear rubro",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": 1,\n  \"denominacion\": \"Electrónica\",\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/rubros",
+            "description": "Crea el rubro requerido por Articulo y guarda el ID en {{rubroId}}."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Rubro creado: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('rubroId', body.id);"
+          ] } }]
+        },
+        {
+          "name": "07 - Crear marca",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": 1,\n  \"denominacion\": \"Genérica\",\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/marcas",
+            "description": "Crea la marca del artículo y guarda el ID en {{marcaId}}."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Marca creada: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('marcaId', body.id);"
+          ] } }]
+        },
+        {
+          "name": "08 - Crear lista de precios",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"LP-GENERAL\",\n  \"denominacion\": \"Lista General\",\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/listas-precio",
+            "description": "Crea la lista que contendrá el precio utilizado por el detalle. Guarda el ID en {{listaPrecioId}}."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Lista creada: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('listaPrecioId', body.id);"
+          ] } }]
+        },
+        {
+          "name": "09 - Crear artículo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"ART-001\",\n  \"denominacion\": \"Teclado mecánico\",\n  \"rubroId\": {{rubroId}},\n  \"marcaId\": {{marcaId}},\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/articulos",
+            "description": "Crea el artículo asociado al rubro y a la marca anteriores. Guarda el ID en {{articuloId}}."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Artículo creado: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('articuloId', body.id);"
+          ] } }]
+        },
+        {
+          "name": "10 - Asignar precio al artículo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"listaPrecioId\": {{listaPrecioId}},\n  \"articuloId\": {{articuloId}},\n  \"precioVenta\": 1500.0,\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/precios-articulo",
+            "description": "Relaciona el artículo con la lista y define su precio por defecto. El detalle de factura referencia esta relación. Guarda el ID en {{listaPrecioArticuloId}}."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Precio creado: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('listaPrecioArticuloId', body.id);"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "01 - Crear facturas",
+      "description": "Ejecutar después de preparar los datos maestros. El servidor calcula importeSubtotal, importeTotal e importeSaldo; no se envían calculados desde Postman.",
+      "item": [
+        {
+          "name": "11 - Crear factura con cliente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-15\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 3000.0,\n  \"observaciones\": \"Factura creada desde Postman\",\n  \"detalles\": [\n    {\n      \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n      \"descripcion\": \"Dos teclados mecánicos\",\n      \"cantidad\": 2,\n      \"precioUnitario\": null\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/facturas",
+            "description": "Crea la factura 1001 para Empresa Tech. precioUnitario null hace que el servidor use precioVenta (1500). Cantidad 2 produce un total de 3000. cantidadItems será 1 porque COUNT(d) cuenta líneas de detalle, no unidades."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Factura creada: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('facturaId', body.id);",
+            "pm.test('Total calculado: 3000', () => pm.expect(body.importeTotal).to.eql(3000));",
+            "pm.test('Una línea de detalle', () => pm.expect(body.cantidadItems).to.eql(1));"
+          ] } }]
+        },
+        {
+          "name": "12 - Crear factura Consumidor Final",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1002,\n  \"fechaEmision\": \"2026-03-20\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": null,\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 0,\n  \"observaciones\": \"Venta sin cliente asociado\",\n  \"detalles\": [\n    {\n      \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n      \"descripcion\": \"Teclado en promoción\",\n      \"cantidad\": 1,\n      \"precioUnitario\": 1200.0\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/facturas",
+            "description": "Crea la factura 1002 sin cliente. En el reporte, COALESCE transforma el cliente nulo en Consumidor Final. El precio 1200 enviado reemplaza el precio por defecto de la lista para esta línea."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Factura Consumidor Final creada: HTTP 201', () => pm.response.to.have.status(201));",
+            "pm.test('Total calculado: 1200', () => pm.expect(pm.response.json().importeTotal).to.eql(1200));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "02 - Consultar facturas y filtros",
+      "description": "Estos GET devuelven FacturaReporteDTO, no entidades completas. Los filtros son opcionales y pueden combinarse.",
+      "item": [
+        {
+          "name": "13 - Consultar todas",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas", "description": "Devuelve todas las facturas con al menos un detalle. Verifica los siete campos exactos del DTO y que la factura 1002 aparezca como Consumidor Final." },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('Es un arreglo', () => pm.expect(body).to.be.an('array'));",
+            "pm.test('DTO con 7 campos', () => body.forEach(f => pm.expect(Object.keys(f).sort()).to.eql(['cantidadItems','clienteDenominacion','condicionIva','fechaEmision','importeTotal','numeroFactura','puntoVentaDescripcion'].sort())));",
+            "pm.test('COALESCE devuelve Consumidor Final', () => pm.expect(body.find(f => f.numeroFactura === 1002).clienteDenominacion).to.eql('Consumidor Final'));"
+          ] } }]
+        },
+        {
+          "name": "14 - Filtrar desde una fecha",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas?fechaDesde={{fechaDesde}}", "description": "Incluye únicamente facturas con fechaEmision mayor o igual a fechaDesde. Formato obligatorio: yyyy-MM-dd." },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "const b=pm.response.json(), d=pm.collectionVariables.get('fechaDesde'); pm.test('Respeta fechaDesde', () => b.forEach(f => pm.expect(f.fechaEmision >= d).to.be.true));"
+          ] } }]
+        },
+        {
+          "name": "15 - Filtrar hasta una fecha",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas?fechaHasta={{fechaHasta}}", "description": "Incluye únicamente facturas con fechaEmision menor o igual a fechaHasta." },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "const b=pm.response.json(), h=pm.collectionVariables.get('fechaHasta'); pm.test('Respeta fechaHasta', () => b.forEach(f => pm.expect(f.fechaEmision <= h).to.be.true));"
+          ] } }]
+        },
+        {
+          "name": "16 - Filtrar por estado",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas?estado={{estado}}", "description": "Filtra por estado sin distinguir mayúsculas y minúsculas. Ejemplos: EMITIDA o ANULADA." },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200 y arreglo JSON', () => { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.be.an('array'); });"] } }]
+        },
+        {
+          "name": "17 - Filtrar por monto mínimo",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas?montoMinimo={{montoMinimo}}", "description": "Devuelve facturas cuyo importeTotal sea mayor o igual al montoMinimo configurado en las variables de la colección." },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "const b=pm.response.json(), m=Number(pm.collectionVariables.get('montoMinimo')); pm.test('Respeta monto mínimo', () => b.forEach(f => pm.expect(f.importeTotal).to.be.at.least(m)));"
+          ] } }]
+        },
+        {
+          "name": "18 - Combinar los cuatro filtros",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas?fechaDesde={{fechaDesde}}&fechaHasta={{fechaHasta}}&estado={{estado}}&montoMinimo={{montoMinimo}}", "description": "Demuestra que todos los parámetros son opcionales pero también pueden aplicarse juntos en la consulta JPQL dinámica." },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200 y arreglo JSON', () => { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.be.an('array'); });"] } }]
+        },
+        {
+          "name": "19 - Consulta sin resultados",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas?estado=__ESTADO_INEXISTENTE__", "description": "Prueba válida sin coincidencias. La API debe responder HTTP 200 con un arreglo vacío, no un error." },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200 con arreglo vacío', () => { pm.response.to.have.status(200); pm.expect(pm.response.json()).to.eql([]); });"] } }]
+        }
+      ]
+    },
+    {
+      "name": "03 - Validar errores",
+      "description": "Casos deliberadamente incorrectos para comprobar que la API responde HTTP 400 con un mensaje entendible.",
+      "item": [
+        {
+          "name": "20 - Fecha con formato incorrecto",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas?fechaDesde=15-03-2026", "description": "La API exige yyyy-MM-dd. Este request usa dd-MM-yyyy a propósito y debe fallar." },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 400', () => pm.response.to.have.status(400));"] } }]
+        },
+        {
+          "name": "21 - Fechas invertidas",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas?fechaDesde=2026-12-31&fechaHasta=2026-01-01", "description": "fechaDesde no puede ser posterior a fechaHasta. Debe responder HTTP 400." },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 400', () => pm.response.to.have.status(400));"] } }]
+        },
+        {
+          "name": "22 - Monto negativo",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas?montoMinimo=-1", "description": "montoMinimo debe ser cero o positivo. Este request comprueba la validación." },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 400', () => pm.response.to.have.status(400));"] } }]
+        },
+        {
+          "name": "23 - Repetir número de factura",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-15\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"detalles\": [{\n    \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n    \"cantidad\": 1,\n    \"precioUnitario\": null\n  }]\n}" },
+            "url": "{{baseUrl}}/api/facturas",
+            "description": "Intenta crear nuevamente la factura 1001. El servicio impide números duplicados y responde HTTP 400. Ejecutar después del request 11."
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Número duplicado: HTTP 400', () => pm.response.to.have.status(400));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "04 - Descargar reportes",
+      "description": "PDF y Excel ejecutan la misma búsqueda JPQL y aceptan los mismos cuatro filtros del endpoint JSON. En Postman se pueden guardar con Send and Download.",
+      "item": [
+        {
+          "name": "24 - Descargar PDF completo",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas/reporte/pdf", "description": "Genera reporte-facturas.pdf con todas las facturas. Usar Send and Download para elegir dónde guardarlo." },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.test('Es PDF', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));",
+            "pm.test('Archivo no vacío', () => pm.expect(pm.response.responseSize).to.be.above(100));"
+          ] } }]
+        },
+        {
+          "name": "25 - Descargar PDF filtrado",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas/reporte/pdf?fechaDesde={{fechaDesde}}&fechaHasta={{fechaHasta}}&estado={{estado}}&montoMinimo={{montoMinimo}}", "description": "Genera el PDF aplicando simultáneamente las variables de fecha, estado y monto." },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200 y PDF', () => { pm.response.to.have.status(200); pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'); });"] } }]
+        },
+        {
+          "name": "26 - Descargar Excel completo",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas/reporte/excel", "description": "Genera reporte-facturas.xlsx con columnas tipadas, fechas y montos formateados. Usar Send and Download para guardarlo." },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.test('Es XLSX', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'));",
+            "pm.test('Archivo no vacío', () => pm.expect(pm.response.responseSize).to.be.above(100));"
+          ] } }]
+        },
+        {
+          "name": "27 - Descargar Excel filtrado",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas/reporte/excel?fechaDesde={{fechaDesde}}&fechaHasta={{fechaHasta}}&estado={{estado}}&montoMinimo={{montoMinimo}}", "description": "Genera el XLSX usando exactamente los mismos filtros que el JSON y el PDF." },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200 y XLSX', () => { pm.response.to.have.status(200); pm.expect(pm.response.headers.get('Content-Type')).to.include('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); });"] } }]
+        }
+      ]
+    }
+  ]
+}

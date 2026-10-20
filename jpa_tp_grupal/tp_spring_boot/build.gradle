@@ -1,5 +1,6 @@
 plugins {
 	id 'java'
+	// CONSIGNA - PARTE 3.1: Spring Boot version 3.x o superior.
 	id 'org.springframework.boot' version '4.1.1'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -8,9 +9,8 @@ group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 
 java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
-	}
+	sourceCompatibility = '17'
+	targetCompatibility = '17'
 }
 
 repositories {
@@ -18,20 +18,23 @@ repositories {
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-h2console'
+	// CONSIGNA - PARTE 3.1: Spring Data JPA y Spring Web.
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+	// CONSIGNA - PARTE 2: librerias elegidas para generar PDF y Excel XLSX.
+	implementation 'com.github.librepdf:openpdf:1.3.43'
+	implementation 'org.apache.poi:poi-ooxml:5.3.0'
+
+	// CONSIGNA - PARTE 1.1 y PARTE 3.1: Lombok y su procesador de anotaciones.
 	compileOnly 'org.projectlombok:lombok'
-	developmentOnly 'org.springframework.boot:spring-boot-devtools'
-	runtimeOnly 'com.h2database:h2'
 	annotationProcessor 'org.projectlombok:lombok'
-	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-	testCompileOnly 'org.projectlombok:lombok'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-	testAnnotationProcessor 'org.projectlombok:lombok'
+
+	// CONSIGNA - PARTE 3.1: driver SQL. Se usa el driver oficial de MariaDB
+	// porque esta adaptacion debe funcionar especificamente con MariaDB.
+	runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
 }
 
-tasks.named('test') {
-	useJUnitPlatform()
+tasks.withType(JavaCompile).configureEach {
+	options.release = 17
 }
