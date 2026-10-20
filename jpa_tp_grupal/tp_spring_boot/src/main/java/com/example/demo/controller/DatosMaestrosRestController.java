@@ -2,20 +2,37 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.DatosMaestrosDTO;
 import com.example.demo.dto.EntidadCreadaDTO;
+import com.example.demo.dto.ArticuloDisponibleDTO;
+import com.example.demo.dto.FacturaOpcionesDTO;
 import com.example.demo.service.DatosMaestrosService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/datos-maestros")
 @RequiredArgsConstructor
+@CrossOrigin(origins = "http://localhost:5173")
 public class DatosMaestrosRestController {
 
     private final DatosMaestrosService service;
+
+    @GetMapping("/precios-articulo")
+    public List<ArticuloDisponibleDTO> buscarArticulosDisponibles() {
+        return service.buscarArticulosDisponibles();
+    }
+
+    @GetMapping("/opciones-factura")
+    public FacturaOpcionesDTO buscarOpcionesFactura() {
+        return service.buscarOpcionesFactura();
+    }
 
     @PostMapping("/usuarios")
     public ResponseEntity<EntidadCreadaDTO> crearUsuario(

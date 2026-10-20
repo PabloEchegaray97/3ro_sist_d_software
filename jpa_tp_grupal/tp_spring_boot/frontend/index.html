@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7f7f7" />
+    <title>Facturación</title>
+  </head>
+  <body>
+    <!-- CONSIGNA ESCRITURA - 7.a: navegación plana, sin header ni librerías UI. -->
+    <nav aria-label="Navegación principal">
+      <div>
+        <span>Facturación</span>
+      </div>
+    </nav>
+
+    <main>
+      <section id="listado" data-panel>
+        <div data-heading>
+          <div><h1>Comprobantes registrados</h1><p>Consultá, anulá o eliminá las facturas existentes.</p></div>
+          <div data-actions>
+            <button id="abrir-nueva-factura" type="button" data-variant="primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Nueva factura</span></button>
+            <button id="abrir-filtros" type="button"><i class="ph ph-funnel" aria-hidden="true"></i><span>Filtros</span></button>
+            <button id="recargar" type="button"><i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Recargar</span></button>
+          </div>
+        </div>
+        <div data-table>
+          <table class="facturas-table">
+            <thead><tr><th>ID</th><th>Número</th><th>Fecha</th><th>Cliente</th><th>Condición IVA</th><th>Punto de venta</th><th>Total</th><th>Ítems</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="facturas-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <dialog id="nueva-factura-modal">
+        <div data-dialog-heading>
+          <div><h2>Nueva factura</h2><p>Ingresá la cabecera y uno o más detalles.</p></div>
+          <button id="cerrar-nueva-factura" class="icon-button" type="button" aria-label="Cerrar nueva factura" title="Cerrar"><i class="ph ph-x" aria-hidden="true"></i></button>
+        </div>
+        <form id="form-factura">
+          <fieldset>
+            <legend>Datos del comprobante</legend>
+            <label><span>Número</span><input id="numero" type="number" min="1" readonly required /></label>
+            <label><span>Fecha y hora</span><input id="fecha-emision" type="datetime-local" required /></label>
+            <label><span>Punto de venta</span><select id="punto-venta-id" disabled required><option>Cargando…</option></select></label>
+            <label><span>Cliente</span><select id="cliente-id" disabled><option>Cargando…</option></select></label>
+            <label><span>Condición de IVA</span><select id="condicion-iva-id" disabled required><option>Cargando…</option></select></label>
+            <label><span>Tipo de moneda</span><select id="tipo-moneda-id" disabled required><option>Cargando…</option></select></label>
+            <label><span>Usuario</span><select id="usuario-id" disabled required><option>Cargando administrador…</option></select></label>
+          </fieldset>
+          <label><span>Observaciones</span><textarea id="observaciones" rows="3"></textarea></label>
+          <div data-item-picker>
+            <label><span>Artículo y lista de precio</span><select id="articulo-disponible" disabled><option>Cargando artículos…</option></select></label>
+            <button id="agregar-detalle" type="button" disabled><i class="ph ph-plus" aria-hidden="true"></i><span>Agregar ítem</span></button>
+          </div>
+          <div data-table>
+            <table>
+              <thead><tr><th>Artículo ID</th><th>Precio lista ID</th><th>Descripción</th><th>Cantidad</th><th>Precio</th><th>Bonif. %</th><th>IVA %</th><th></th></tr></thead>
+              <tbody id="detalles-body"></tbody>
+            </table>
+          </div>
+          <div data-total>
+            <span>Total calculado</span>
+            <output id="importe-total">$ 0,00</output>
+          </div>
+          <footer><button type="submit" data-variant="primary"><i class="ph ph-receipt" aria-hidden="true"></i><span>Crear factura</span></button></footer>
+        </form>
+    </dialog>
+
+    <dialog id="filtros-modal">
+      <div data-dialog-heading>
+        <h2>Filtrar comprobantes</h2>
+        <button id="cerrar-filtros" class="icon-button" type="button" aria-label="Cerrar filtros" title="Cerrar"><i class="ph ph-x" aria-hidden="true"></i></button>
+      </div>
+      <form id="form-filtros">
+        <fieldset>
+          <label><span>Desde</span><input id="fecha-desde" type="date" /></label>
+          <label><span>Hasta</span><input id="fecha-hasta" type="date" /></label>
+          <label><span>Estado</span><select id="filtro-estado"><option value="">Todos</option><option value="EMITIDA">Emitida</option><option value="ANULADA">Anulada</option></select></label>
+          <label><span>Monto mínimo</span><input id="monto-minimo" type="number" min="0" step="0.01" /></label>
+        </fieldset>
+        <footer><button id="limpiar-filtros" type="button"><i class="ph ph-eraser" aria-hidden="true"></i><span>Limpiar</span></button><button type="submit" data-variant="primary"><i class="ph ph-check" aria-hidden="true"></i><span>Aplicar</span></button></footer>
+      </form>
+    </dialog>
+
+    <dialog id="confirmacion">
+      <h2 id="confirmacion-titulo"></h2>
+      <p id="confirmacion-texto"></p>
+      <div><button id="cancelar-accion" type="button"><i class="ph ph-x" aria-hidden="true"></i><span>Cancelar</span></button><button id="confirmar-accion" type="button"><i class="ph ph-check" aria-hidden="true"></i><span>Confirmar</span></button></div>
+    </dialog>
+    <output id="mensaje" role="status" aria-live="polite"></output>
+    <script type="module" src="/src/app.ts"></script>
+  </body>
+</html>

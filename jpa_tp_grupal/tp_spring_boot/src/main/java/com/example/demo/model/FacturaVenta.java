@@ -37,7 +37,7 @@ public class FacturaVenta extends AuditoriaApp {
     private Long numero;
 
     @Column(nullable = false)
-    @Temporal(TemporalType.DATE)
+    @Temporal(TemporalType.TIMESTAMP)
     private Date fechaEmision;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -82,6 +82,8 @@ public class FacturaVenta extends AuditoriaApp {
 
     private String observaciones;
 
+    // CONSIGNA ESCRITURA - 2.b y 2.d: cascade ALL persiste y elimina los
+    // detalles junto con la factura; orphanRemoval elimina items reemplazados.
     @OneToMany(mappedBy = "factura", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     // CONSIGNA - PARTE 1.3: la coleccion bidireccional queda fuera de

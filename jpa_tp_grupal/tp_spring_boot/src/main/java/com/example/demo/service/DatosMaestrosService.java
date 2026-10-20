@@ -2,6 +2,8 @@ package com.example.demo.service;
 
 import com.example.demo.dto.DatosMaestrosDTO;
 import com.example.demo.dto.EntidadCreadaDTO;
+import com.example.demo.dto.ArticuloDisponibleDTO;
+import com.example.demo.dto.FacturaOpcionesDTO;
 import com.example.demo.model.Articulo;
 import com.example.demo.model.AuditoriaApp;
 import com.example.demo.model.Cliente;
@@ -21,12 +23,159 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
+import java.util.List;
 
 @Service
 public class DatosMaestrosService {
 
     @PersistenceContext
     private EntityManager entityManager;
+
+    @Transactional
+    public int migrarCondicionIvaClientesExistentes() {
+        Usuario admin = entityManager.createQuery(
+                        "SELECT u FROM Usuario u WHERE LOWER(u.usuario) = 'admin' ORDER BY u.id",
+                        Usuario.class
+                ).setMaxResults(1)
+                .getResultStream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "No existe el usuario admin para migrar las condiciones de IVA"
+                ));
+
+        CondicionIva responsableInscripto = buscarOCrearCondicionIva(
+                "%responsable inscripto%",
+                1,
+                "IVA Responsable Inscripto",
+                admin
+        );
+        CondicionIva consumidorFinal = buscarOCrearCondicionIva(
+                "%consumidor final%",
+                5,
+                "Consumidor Final",
+                admin
+        );
+
+        List<Cliente> clientesSinCondicion = entityManager.createQuery(
+                "SELECT c FROM Cliente c WHERE c.condicionIva IS NULL",
+                Cliente.class
+        ).getResultList();
+
+        clientesSinCondicion.forEach(cliente -> {
+            String denominacion = cliente.getDenominacion() == null
+                    ? ""
+                    : cliente.getDenominacion().trim().toLowerCase();
+            cliente.setCondicionIva(
+                    denominacion.contains("consumidor final")
+                            ? consumidorFinal
+                            : responsableInscripto
+            );
+        });
+        return clientesSinCondicion.size();
+    }
+
+    private CondicionIva buscarOCrearCondicionIva(
+            String patron,
+            int codigoAfip,
+            String denominacion,
+            Usuario admin
+    ) {
+        return entityManager.createQuery(
+                        "SELECT c FROM CondicionIva c " +
+                                "WHERE LOWER(c.denominacion) LIKE :patron ORDER BY c.id",
+                        CondicionIva.class
+                ).setParameter("patron", patron)
+                .setMaxResults(1)
+                .getResultStream()
+                .findFirst()
+                .orElseGet(() -> {
+                    CondicionIva condicion = auditar(new CondicionIva(), admin);
+                    condicion.setCodigoAfip(codigoAfip);
+                    condicion.setDenominacion(denominacion);
+                    entityManager.persist(condicion);
+                    return condicion;
+                });
+    }
+
+    @Transactional(readOnly = true)
+    public List<ArticuloDisponibleDTO> buscarArticulosDisponibles() {
+        return entityManager.createQuery("""
+                SELECT new com.example.demo.dto.ArticuloDisponibleDTO(
+                    precio.id,
+                    articulo.id,
+                    articulo.codigo,
+                    articulo.denominacion,
+                    lista.denominacion,
+                    precio.precioVenta
+                )
+                FROM ListaPrecioArticulo precio
+                JOIN precio.articulo articulo
+                JOIN precio.listaPrecio lista
+                ORDER BY articulo.denominacion, lista.denominacion
+                """, ArticuloDisponibleDTO.class).getResultList();
+    }
+
+    @Transactional(readOnly = true)
+    public FacturaOpcionesDTO buscarOpcionesFactura() {
+        Long siguienteNumero = entityManager.createQuery(
+                "SELECT COALESCE(MAX(f.numero), 0) + 1 FROM FacturaVenta f",
+                Long.class
+        ).getSingleResult();
+
+        List<FacturaOpcionesDTO.OpcionDTO> puntosVenta = entityManager.createQuery(
+                        "SELECT p FROM PuntoVenta p ORDER BY p.numero",
+                        PuntoVenta.class
+                ).getResultList().stream()
+                .map(p -> opcion(p.getId(), p.getNumero() + " - " + p.getDescripcion()))
+                .toList();
+
+        List<FacturaOpcionesDTO.ClienteOpcionDTO> clientes = entityManager.createQuery(
+                        "SELECT c FROM Cliente c ORDER BY c.denominacion",
+                        Cliente.class
+                ).getResultList().stream()
+                .map(c -> new FacturaOpcionesDTO.ClienteOpcionDTO(
+                        c.getId(),
+                        c.getDenominacion(),
+                        c.getCondicionIva() == null ? null : c.getCondicionIva().getId()
+                ))
+                .toList();
+
+        List<FacturaOpcionesDTO.OpcionDTO> condicionesIva = entityManager.createQuery(
+                        "SELECT c FROM CondicionIva c ORDER BY c.denominacion",
+                        CondicionIva.class
+                ).getResultList().stream()
+                .map(c -> opcion(c.getId(), c.getDenominacion()))
+                .toList();
+
+        List<FacturaOpcionesDTO.OpcionDTO> tiposMoneda = entityManager.createQuery(
+                        "SELECT t FROM TipoMoneda t ORDER BY t.denominacion",
+                        TipoMoneda.class
+                ).getResultList().stream()
+                .map(t -> opcion(t.getId(), t.getDenominacion() + " (" + t.getSimbolo() + ")"))
+                .toList();
+
+        FacturaOpcionesDTO.OpcionDTO usuario = entityManager.createQuery(
+                        "SELECT u FROM Usuario u WHERE LOWER(u.usuario) = 'admin' ORDER BY u.id",
+                        Usuario.class
+                ).setMaxResults(1)
+                .getResultList().stream()
+                .findFirst()
+                .map(u -> opcion(u.getId(), u.getNombre() + " " + u.getApellido() + " (admin)"))
+                .orElse(null);
+
+        return new FacturaOpcionesDTO(
+                siguienteNumero,
+                puntosVenta,
+                clientes,
+                condicionesIva,
+                tiposMoneda,
+                usuario
+        );
+    }
+
+    private FacturaOpcionesDTO.OpcionDTO opcion(Long id, String descripcion) {
+        return new FacturaOpcionesDTO.OpcionDTO(id, descripcion);
+    }
 
     @Transactional
     public EntidadCreadaDTO crearUsuario(DatosMaestrosDTO.UsuarioRequest request) {
@@ -81,6 +230,11 @@ public class DatosMaestrosService {
     @Transactional
     public EntidadCreadaDTO crearCliente(DatosMaestrosDTO.ClienteRequest request) {
         Usuario usuario = usuario(request.usuarioId());
+        CondicionIva condicionIva = buscar(
+                CondicionIva.class,
+                request.condicionIvaId(),
+                "condicionIvaId"
+        );
         requerido(request.cuitCuil(), "cuitCuil");
         requerido(request.denominacion(), "denominacion");
 
@@ -96,6 +250,7 @@ public class DatosMaestrosService {
         Cliente entidad = auditar(new Cliente(), usuario);
         entidad.setCuitCuil(request.cuitCuil().trim());
         entidad.setDenominacion(request.denominacion().trim());
+        entidad.setCondicionIva(condicionIva);
         entidad.setContacto(contacto);
         entidad.setDomicilio(domicilio);
         return persistir(entidad, entidad.getDenominacion());

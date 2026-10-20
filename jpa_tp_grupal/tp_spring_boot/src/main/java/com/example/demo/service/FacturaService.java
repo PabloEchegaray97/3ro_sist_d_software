@@ -1,9 +1,10 @@
 package com.example.demo.service;
 
+import com.example.demo.dto.FacturaDetalleRequestDTO;
 import com.example.demo.dto.FacturaReporteDTO;
-import com.example.demo.dto.FacturaCreacionDTO;
-import com.example.demo.dto.FacturaCreadaDTO;
-import com.example.demo.dto.FacturaDetalleCreacionDTO;
+import com.example.demo.dto.FacturaRequestDTO;
+import com.example.demo.exception.RecursoNoEncontradoException;
+import com.example.demo.model.Articulo;
 import com.example.demo.model.Cliente;
 import com.example.demo.model.CondicionIva;
 import com.example.demo.model.FacturaVenta;
@@ -25,6 +26,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FacturaService {
 
+    private static final double IVA_PREDETERMINADO = 21.0;
+
     private final FacturaReporteRepository facturaReporteRepository;
     private final FacturaEscrituraRepository facturaEscrituraRepository;
 
@@ -43,114 +46,231 @@ public class FacturaService {
         if (montoMinimo != null && montoMinimo < 0) {
             throw new IllegalArgumentException("montoMinimo no puede ser negativo");
         }
-
         return facturaReporteRepository.buscarFacturasFiltradas(
-                fechaDesde,
-                fechaHasta,
-                estado,
-                montoMinimo
+                fechaDesde, fechaHasta, estado, montoMinimo
         );
     }
 
+    // CONSIGNA ESCRITURA - 2.a y 2.b: la creacion completa es atomica.
+    // Si falla una relacion o un detalle, @Transactional revierte toda la operacion.
     @Transactional
-    public FacturaCreadaDTO crearFactura(FacturaCreacionDTO solicitud) {
-        validarSolicitud(solicitud);
-
+    public FacturaReporteDTO crear(FacturaRequestDTO solicitud) {
+        validarCreacion(solicitud);
         if (facturaEscrituraRepository.existeNumero(solicitud.getNumero())) {
-            throw new IllegalArgumentException("Ya existe una factura con el numero " + solicitud.getNumero());
+            throw new IllegalArgumentException(
+                    "Ya existe una factura con el numero " + solicitud.getNumero()
+            );
         }
 
-        Usuario usuario = facturaEscrituraRepository.buscarRequerido(
-                Usuario.class, solicitud.getUsuarioId(), "usuarioId"
-        );
-        PuntoVenta puntoVenta = facturaEscrituraRepository.buscarRequerido(
-                PuntoVenta.class, solicitud.getPuntoVentaId(), "puntoVentaId"
-        );
-        CondicionIva condicionIva = facturaEscrituraRepository.buscarRequerido(
-                CondicionIva.class, solicitud.getCondicionIvaId(), "condicionIvaId"
-        );
-        TipoMoneda tipoMoneda = facturaEscrituraRepository.buscarRequerido(
-                TipoMoneda.class, solicitud.getTipoMonedaId(), "tipoMonedaId"
-        );
-        Cliente cliente = solicitud.getClienteId() == null
-                ? null
-                : facturaEscrituraRepository.buscarRequerido(
-                        Cliente.class, solicitud.getClienteId(), "clienteId"
-                );
-
-        java.util.Date fechaEmision = java.sql.Date.valueOf(solicitud.getFechaEmision());
+        Usuario usuario = buscarUsuario(solicitud.getUsuarioId());
         FacturaVenta factura = new FacturaVenta();
-        factura.setNumero(solicitud.getNumero());
-        factura.setFechaEmision(fechaEmision);
-        factura.setPuntoVenta(puntoVenta);
-        factura.setCliente(cliente);
-        factura.setCondicionIva(condicionIva);
-        factura.setTipoMoneda(tipoMoneda);
-        factura.setEstado(solicitud.getEstado().trim().toUpperCase());
-        factura.setObservaciones(solicitud.getObservaciones());
-        factura.setFechaAlta(new java.util.Date());
-        factura.setFechaModificacion(new java.util.Date());
+        Date ahora = new Date();
+        factura.setFechaAlta(ahora);
         factura.setUsuarioCarga(usuario);
+        factura.setFechaModificacion(ahora);
         factura.setUsuarioModificacion(usuario);
 
-        double importeTotal = 0;
-        for (FacturaDetalleCreacionDTO item : solicitud.getDetalles()) {
-            validarDetalle(item);
+        // CONSIGNA ESCRITURA - 2.b: mapeo Request DTO -> entidad y busqueda de relaciones por ID.
+        aplicarCabecera(factura, solicitud, true);
+        reemplazarDetalles(factura, solicitud.getDetalles());
+        aplicarCobro(factura, solicitud.getImporteCobrado());
+
+        // CONSIGNA ESCRITURA - 2.b: persistir FacturaVenta guarda los detalles
+        // por cascade = ALL configurado en FacturaVenta.detalles.
+        facturaEscrituraRepository.guardar(factura);
+        return obtenerReporte(factura.getId());
+    }
+
+    // CONSIGNA ESCRITURA - 2.a y 2.c: actualiza cabecera y, si se reciben,
+    // reemplaza todos los items dentro de una unica transaccion.
+    @Transactional
+    public FacturaReporteDTO actualizar(Long id, FacturaRequestDTO solicitud) {
+        if (solicitud == null) {
+            throw new IllegalArgumentException("El cuerpo de la solicitud es obligatorio");
+        }
+
+        FacturaVenta factura = facturaEscrituraRepository.buscarFactura(id);
+        if (solicitud.getNumero() != null
+                && facturaEscrituraRepository.existeNumeroEnOtraFactura(solicitud.getNumero(), id)) {
+            throw new IllegalArgumentException(
+                    "Ya existe otra factura con el numero " + solicitud.getNumero()
+            );
+        }
+
+        boolean actualizacionCompleta = solicitud.getNumero() != null
+                || solicitud.getFechaEmision() != null
+                || solicitud.getPuntoVentaId() != null
+                || solicitud.getCondicionIvaId() != null
+                || solicitud.getTipoMonedaId() != null
+                || solicitud.getDetalles() != null;
+        aplicarCabecera(factura, solicitud, actualizacionCompleta);
+        if (solicitud.getDetalles() != null) {
+            if (solicitud.getDetalles().isEmpty()) {
+                throw new IllegalArgumentException("La factura debe tener al menos un detalle");
+            }
+            reemplazarDetalles(factura, solicitud.getDetalles());
+        }
+
+        Double cobrado = solicitud.getImporteCobrado() != null
+                ? solicitud.getImporteCobrado()
+                : factura.getImporteCobrado();
+        aplicarCobro(factura, cobrado);
+
+        Date ahora = new Date();
+        factura.setFechaModificacion(ahora);
+        if (solicitud.getUsuarioId() != null) {
+            factura.setUsuarioModificacion(buscarUsuario(solicitud.getUsuarioId()));
+        }
+        actualizarFechaAnulacion(factura, ahora);
+
+        facturaEscrituraRepository.guardar(factura);
+        return obtenerReporte(factura.getId());
+    }
+
+    // CONSIGNA ESCRITURA - 2.a, 2.d y 3.1: eliminacion fisica.
+    // Los detalles se eliminan en cascada por orphanRemoval/cascade ALL.
+    @Transactional
+    public void eliminar(Long id) {
+        FacturaVenta factura = facturaEscrituraRepository.buscarFactura(id);
+        facturaEscrituraRepository.eliminar(factura);
+    }
+
+    private void aplicarCabecera(
+            FacturaVenta factura,
+            FacturaRequestDTO solicitud,
+            boolean creacion
+    ) {
+        if (solicitud.getNumero() != null) {
+            if (solicitud.getNumero() <= 0) {
+                throw new IllegalArgumentException("numero debe ser mayor que cero");
+            }
+            factura.setNumero(solicitud.getNumero());
+        }
+        if (solicitud.getFechaEmision() != null) {
+            factura.setFechaEmision(java.sql.Timestamp.valueOf(solicitud.getFechaEmision()));
+        }
+        if (solicitud.getPuntoVentaId() != null) {
+            factura.setPuntoVenta(facturaEscrituraRepository.buscarRequerido(
+                    PuntoVenta.class, solicitud.getPuntoVentaId(), "puntoVentaId"
+            ));
+        }
+        if (solicitud.getCondicionIvaId() != null) {
+            factura.setCondicionIva(facturaEscrituraRepository.buscarRequerido(
+                    CondicionIva.class, solicitud.getCondicionIvaId(), "condicionIvaId"
+            ));
+        }
+        if (solicitud.getTipoMonedaId() != null) {
+            factura.setTipoMoneda(facturaEscrituraRepository.buscarRequerido(
+                    TipoMoneda.class, solicitud.getTipoMonedaId(), "tipoMonedaId"
+            ));
+        }
+        if (creacion || solicitud.getClienteId() != null) {
+            Cliente cliente = solicitud.getClienteId() == null
+                    ? null
+                    : facturaEscrituraRepository.buscarRequerido(
+                            Cliente.class, solicitud.getClienteId(), "clienteId"
+                    );
+            factura.setCliente(cliente);
+            if (cliente != null && cliente.getCondicionIva() != null) {
+                if (solicitud.getCondicionIvaId() != null
+                        && !cliente.getCondicionIva().getId().equals(solicitud.getCondicionIvaId())) {
+                    throw new IllegalArgumentException(
+                            "condicionIvaId no corresponde a la condicion de IVA del cliente"
+                    );
+                }
+                factura.setCondicionIva(cliente.getCondicionIva());
+            }
+        }
+        if (solicitud.getEstado() != null) {
+            if (solicitud.getEstado().isBlank()) {
+                throw new IllegalArgumentException("estado no puede estar vacio");
+            }
+            factura.setEstado(solicitud.getEstado().trim().toUpperCase());
+        }
+        if (solicitud.getObservaciones() != null) {
+            factura.setObservaciones(solicitud.getObservaciones().trim());
+        }
+    }
+
+    // CONSIGNA ESCRITURA - 2.b y 2.c: calcula neto, bonificacion, IVA,
+    // subtotal y total sin aceptar importes calculados por el cliente.
+    private void reemplazarDetalles(
+            FacturaVenta factura,
+            List<FacturaDetalleRequestDTO> solicitudes
+    ) {
+        factura.getDetalles().clear();
+        double total = 0;
+
+        for (FacturaDetalleRequestDTO solicitud : solicitudes) {
+            validarDetalle(solicitud);
+            Articulo articulo = facturaEscrituraRepository.buscarRequerido(
+                    Articulo.class, solicitud.getArticuloId(), "articuloId"
+            );
             ListaPrecioArticulo precio = facturaEscrituraRepository.buscarRequerido(
                     ListaPrecioArticulo.class,
-                    item.getListaPrecioArticuloId(),
+                    solicitud.getListaPrecioArticuloId(),
                     "listaPrecioArticuloId"
             );
-            double precioUnitario = item.getPrecioUnitario() == null
+            if (!precio.getArticulo().getId().equals(articulo.getId())) {
+                throw new IllegalArgumentException(
+                        "listaPrecioArticuloId no corresponde al articuloId indicado"
+                );
+            }
+
+            double precioUnitario = solicitud.getPrecioUnitario() == null
                     ? precio.getPrecioVenta()
-                    : item.getPrecioUnitario();
-            double subtotal = item.getCantidad() * precioUnitario;
+                    : solicitud.getPrecioUnitario();
+            double bonificacion = valorOZero(solicitud.getPorcentajeBonificacion());
+            double porcentajeIva = solicitud.getPorcentajeIva() == null
+                    ? IVA_PREDETERMINADO
+                    : solicitud.getPorcentajeIva();
+
+            double bruto = solicitud.getCantidad() * precioUnitario;
+            double importeNeto = redondear(bruto - (bruto * bonificacion / 100));
+            double importeIva = redondear(importeNeto * porcentajeIva / 100);
+            double subtotal = redondear(importeNeto + importeIva);
 
             FacturaVentaDetalle detalle = new FacturaVentaDetalle();
             detalle.setListaPrecioArticulo(precio);
             detalle.setDescripcion(
-                    item.getDescripcion() == null || item.getDescripcion().isBlank()
-                            ? precio.getArticulo().getDenominacion()
-                            : item.getDescripcion().trim()
+                    solicitud.getDescripcion() == null || solicitud.getDescripcion().isBlank()
+                            ? articulo.getDenominacion()
+                            : solicitud.getDescripcion().trim()
             );
-            detalle.setCantidad(item.getCantidad());
+            detalle.setCantidad(solicitud.getCantidad());
             detalle.setPrecioUnitario(precioUnitario);
-            detalle.setImporteNeto(subtotal);
-            detalle.setImporteIva(0);
+            detalle.setPorcentajeBonificacion(bonificacion);
+            detalle.setImporteNeto(importeNeto);
+            detalle.setImporteIva(importeIva);
             detalle.setImporteSubtotal(subtotal);
             factura.agregarDetalle(detalle);
-            importeTotal += subtotal;
+            total += subtotal;
         }
-
-        double importeCobrado = solicitud.getImporteCobrado() == null
-                ? 0
-                : solicitud.getImporteCobrado();
-        if (importeCobrado < 0 || importeCobrado > importeTotal) {
-            throw new IllegalArgumentException("importeCobrado debe estar entre 0 y el importe total");
-        }
-        factura.setImporteTotal(importeTotal);
-        factura.setImporteCobrado(importeCobrado);
-        factura.setImporteSaldo(importeTotal - importeCobrado);
-
-        facturaEscrituraRepository.guardar(factura);
-        return new FacturaCreadaDTO(
-                factura.getId(),
-                factura.getNumero(),
-                factura.getEstado(),
-                factura.getImporteTotal(),
-                factura.getDetalles().size()
-        );
+        factura.setImporteTotal(redondear(total));
     }
 
-    private void validarSolicitud(FacturaCreacionDTO solicitud) {
+    private void aplicarCobro(FacturaVenta factura, Double importeCobrado) {
+        double cobrado = valorOZero(importeCobrado);
+        if (cobrado < 0 || cobrado > factura.getImporteTotal()) {
+            throw new IllegalArgumentException(
+                    "importeCobrado debe estar entre 0 y el importe total"
+            );
+        }
+        factura.setImporteCobrado(redondear(cobrado));
+        factura.setImporteSaldo(redondear(factura.getImporteTotal() - cobrado));
+    }
+
+    private void validarCreacion(FacturaRequestDTO solicitud) {
         if (solicitud == null) {
             throw new IllegalArgumentException("El cuerpo de la solicitud es obligatorio");
         }
-        if (solicitud.getNumero() == null || solicitud.getNumero() <= 0) {
-            throw new IllegalArgumentException("numero debe ser mayor que cero");
-        }
-        if (solicitud.getFechaEmision() == null) {
-            throw new IllegalArgumentException("fechaEmision es obligatoria");
+        if (solicitud.getNumero() == null || solicitud.getFechaEmision() == null
+                || solicitud.getPuntoVentaId() == null || solicitud.getCondicionIvaId() == null
+                || solicitud.getTipoMonedaId() == null || solicitud.getUsuarioId() == null) {
+            throw new IllegalArgumentException(
+                    "numero, fechaEmision, puntoVentaId, condicionIvaId, " +
+                    "tipoMonedaId y usuarioId son obligatorios"
+            );
         }
         if (solicitud.getEstado() == null || solicitud.getEstado().isBlank()) {
             throw new IllegalArgumentException("estado es obligatorio");
@@ -160,15 +280,57 @@ public class FacturaService {
         }
     }
 
-    private void validarDetalle(FacturaDetalleCreacionDTO item) {
-        if (item == null) {
+    private void validarDetalle(FacturaDetalleRequestDTO solicitud) {
+        if (solicitud == null) {
             throw new IllegalArgumentException("Los detalles no pueden contener valores nulos");
         }
-        if (item.getCantidad() == null || item.getCantidad() <= 0) {
-            throw new IllegalArgumentException("La cantidad de cada detalle debe ser mayor que cero");
+        if (solicitud.getArticuloId() == null || solicitud.getListaPrecioArticuloId() == null) {
+            throw new IllegalArgumentException(
+                    "articuloId y listaPrecioArticuloId son obligatorios en cada detalle"
+            );
         }
-        if (item.getPrecioUnitario() != null && item.getPrecioUnitario() < 0) {
+        if (solicitud.getCantidad() == null || solicitud.getCantidad() <= 0) {
+            throw new IllegalArgumentException("cantidad debe ser mayor que cero");
+        }
+        if (solicitud.getPrecioUnitario() != null && solicitud.getPrecioUnitario() < 0) {
             throw new IllegalArgumentException("precioUnitario no puede ser negativo");
         }
+        validarPorcentaje(solicitud.getPorcentajeBonificacion(), "porcentajeBonificacion", 100);
+        validarPorcentaje(solicitud.getPorcentajeIva(), "porcentajeIva", null);
+    }
+
+    private void validarPorcentaje(Double valor, String campo, Integer maximo) {
+        if (valor != null && (valor < 0 || (maximo != null && valor > maximo))) {
+            throw new IllegalArgumentException(campo + " tiene un valor invalido");
+        }
+    }
+
+    private void actualizarFechaAnulacion(FacturaVenta factura, Date ahora) {
+        if ("ANULADA".equalsIgnoreCase(factura.getEstado())) {
+            if (factura.getFechaAnulacion() == null) {
+                factura.setFechaAnulacion(ahora);
+            }
+        } else {
+            factura.setFechaAnulacion(null);
+        }
+    }
+
+    private Usuario buscarUsuario(Long id) {
+        return facturaEscrituraRepository.buscarRequerido(Usuario.class, id, "usuarioId");
+    }
+
+    private FacturaReporteDTO obtenerReporte(Long id) {
+        return facturaReporteRepository.buscarReportePorId(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "No se pudo generar el reporte de la factura " + id
+                ));
+    }
+
+    private double valorOZero(Double valor) {
+        return valor == null ? 0 : valor;
+    }
+
+    private double redondear(double valor) {
+        return Math.round(valor * 100.0) / 100.0;
     }
 }

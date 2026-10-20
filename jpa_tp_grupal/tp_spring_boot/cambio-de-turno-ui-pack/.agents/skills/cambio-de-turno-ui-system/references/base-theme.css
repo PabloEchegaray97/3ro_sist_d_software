@@ -1,0 +1,100 @@
+/*
+  Tokens base para Cambio de Turno.
+  Copiar/adaptar en globals.css. Mantener los nombres de variables para que
+  los componentes y la skill puedan usar clases Tailwind con var(...).
+*/
+
+:root {
+  --primary-brand: #0077ff;
+  --primary: var(--primary-brand);
+  --primary-foreground: #ffffff;
+
+  --surface-0: #f7f7f7;
+  --surface-card-light: #ffffff;
+  --surface-card-dark: #020817;
+  --surface-card: var(--surface-card-light);
+  --surface-1: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  --surface-2: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  --bg-primary: var(--surface-0);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --text: var(--text-primary);
+  --muted: #94a3b8;
+
+  --border-default-color: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  --border-subtle-color: color-mix(in srgb, var(--text-primary) 8%, transparent);
+
+  --interactive-focus-ring: color-mix(in srgb, var(--primary-brand) 28%, transparent);
+  --ring-primary: var(--interactive-focus-ring);
+
+  --interactive-hover-bg: color-mix(in srgb, var(--primary-brand) 8%, transparent);
+  --interactive-hover-bg-strong: color-mix(in srgb, var(--primary-brand) 12%, transparent);
+
+  --selection-bg-color: color-mix(in srgb, var(--primary-brand) 14%, transparent);
+  --selection-border-color: color-mix(in srgb, var(--primary-brand) 24%, transparent);
+  --selection-text-color: var(--text-primary);
+  --selection-dot-color: var(--primary-brand);
+  --interactive-selected-bg: var(--selection-bg-color);
+  --interactive-selected-border: var(--selection-border-color);
+  --interactive-selected-text: var(--selection-text-color);
+  --interactive-selected-dot: var(--selection-dot-color);
+  --selection: var(--selection-bg-color);
+
+  --button-secondary-bg: var(--surface-card);
+  --button-secondary-hover-bg: var(--interactive-hover-bg);
+  --button-secondary-active-bg: var(--interactive-hover-bg-strong);
+  --button-ghost-hover-bg: var(--interactive-hover-bg);
+  --button-ghost-active-bg: var(--interactive-hover-bg-strong);
+
+  --danger: #dc2626;
+  --danger-hover-bg: #b91c1c;
+  --danger-active-bg: #991b1b;
+  --danger-foreground: #ffffff;
+
+  --state-success: #16a34a;
+  --state-success-soft: #f0fdf4;
+  --state-success-border: rgb(22 163 74 / 0.28);
+  --state-success-foreground: #ffffff;
+
+  --elevation-xs: 0 1px 2px rgb(15 23 42 / 0.06);
+  --elevation-sm: 0 8px 18px rgb(15 23 42 / 0.08);
+  --elevation-lg: 0 24px 60px rgb(15 23 42 / 0.18);
+}
+
+.dark {
+  --surface-0: #0b1020;
+  --surface-card: var(--surface-card-dark);
+  --surface-1: color-mix(in srgb, white 8%, transparent);
+  --surface-2: color-mix(in srgb, white 12%, transparent);
+  --bg-primary: var(--surface-0);
+
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --text: var(--text-primary);
+  --muted: #64748b;
+
+  --border-default-color: color-mix(in srgb, white 16%, transparent);
+  --border-subtle-color: color-mix(in srgb, white 10%, transparent);
+
+  --interactive-hover-bg: color-mix(in srgb, var(--primary-brand) 10%, transparent);
+  --interactive-hover-bg-strong: color-mix(in srgb, var(--primary-brand) 16%, transparent);
+
+  --selection-bg-color: color-mix(in srgb, var(--primary-brand) 16%, transparent);
+  --selection-border-color: color-mix(in srgb, var(--primary-brand) 26%, transparent);
+  --selection-text-color: var(--text-primary);
+  --selection-dot-color: var(--primary-brand);
+
+  --button-secondary-bg: var(--surface-card);
+  --button-secondary-hover-bg: var(--interactive-hover-bg);
+  --button-secondary-active-bg: var(--interactive-hover-bg-strong);
+  --button-ghost-hover-bg: var(--interactive-hover-bg);
+  --button-ghost-active-bg: var(--interactive-hover-bg-strong);
+
+  --state-success: #4ade80;
+  --state-success-soft: rgb(34 197 94 / 0.16);
+  --state-success-border: rgb(74 222 128 / 0.3);
+  --state-success-foreground: #04150a;
+}

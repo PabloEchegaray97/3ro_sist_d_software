@@ -90,9 +90,9 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"cuitCuil\": \"30-12345678-9\",\n  \"denominacion\": \"Empresa Tech S.A.\",\n  \"email\": \"contacto@empresa-tech.com\",\n  \"telefono\": \"2614000000\",\n  \"celular\": \"2615000000\",\n  \"nombreCalle\": \"San Martin\",\n  \"numeroCalle\": \"100\",\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"cuitCuil\": \"30-12345678-9\",\n  \"denominacion\": \"Empresa Tech S.A.\",\n  \"email\": \"contacto@empresa-tech.com\",\n  \"telefono\": \"2614000000\",\n  \"celular\": \"2615000000\",\n  \"nombreCalle\": \"San Martin\",\n  \"numeroCalle\": \"100\",\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"usuarioId\": {{usuarioId}}\n}" },
             "url": "{{baseUrl}}/api/datos-maestros/clientes",
-            "description": "Crea cliente, contacto y domicilio en una sola operación. Guarda el ID en {{clienteId}}. En una factura puede enviarse clienteId null para obtener Consumidor Final."
+            "description": "Crea cliente, contacto y domicilio, y lo vincula con {{condicionIvaId}}. Guarda el ID en {{clienteId}}. En una factura puede enviarse clienteId null para obtener Consumidor Final."
           },
           "event": [{ "listen": "test", "script": { "exec": [
             "pm.test('Cliente creado: HTTP 201', () => pm.response.to.have.status(201));",
@@ -180,14 +180,14 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-15\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 3000.0,\n  \"observaciones\": \"Factura creada desde Postman\",\n  \"detalles\": [\n    {\n      \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n      \"descripcion\": \"Dos teclados mecánicos\",\n      \"cantidad\": 2,\n      \"precioUnitario\": null\n    }\n  ]\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-15T10:00:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 3000.0,\n  \"observaciones\": \"Factura creada desde Postman\",\n  \"detalles\": [\n    {\n      \"articuloId\": {{articuloId}},\n      \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n      \"descripcion\": \"Dos teclados mecánicos\",\n      \"cantidad\": 2,\n      \"precioUnitario\": null,\n      \"porcentajeBonificacion\": 0,\n      \"porcentajeIva\": 21\n    }\n  ]\n}", "options": { "raw": { "language": "json" } } },
             "url": "{{baseUrl}}/api/facturas",
-            "description": "Crea la factura 1001 para Empresa Tech. precioUnitario null hace que el servidor use precioVenta (1500). Cantidad 2 produce un total de 3000. cantidadItems será 1 porque COUNT(d) cuenta líneas de detalle, no unidades."
+            "description": "Crea la factura 1001 para Empresa Tech. Usa precio de lista 1500 y calcula neto 3000, IVA 630 y total 3630. cantidadItems es 1 porque COUNT(d) cuenta líneas, no unidades."
           },
           "event": [{ "listen": "test", "script": { "exec": [
             "pm.test('Factura creada: HTTP 201', () => pm.response.to.have.status(201));",
             "const body = pm.response.json(); pm.collectionVariables.set('facturaId', body.id);",
-            "pm.test('Total calculado: 3000', () => pm.expect(body.importeTotal).to.eql(3000));",
+            "pm.test('Neto más IVA calculado: 3630', () => pm.expect(body.importeTotal).to.eql(3630));",
             "pm.test('Una línea de detalle', () => pm.expect(body.cantidadItems).to.eql(1));"
           ] } }]
         },
@@ -196,13 +196,13 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1002,\n  \"fechaEmision\": \"2026-03-20\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": null,\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 0,\n  \"observaciones\": \"Venta sin cliente asociado\",\n  \"detalles\": [\n    {\n      \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n      \"descripcion\": \"Teclado en promoción\",\n      \"cantidad\": 1,\n      \"precioUnitario\": 1200.0\n    }\n  ]\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1002,\n  \"fechaEmision\": \"2026-03-20T11:30:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": null,\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 0,\n  \"observaciones\": \"Venta sin cliente asociado\",\n  \"detalles\": [\n    {\n      \"articuloId\": {{articuloId}},\n      \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n      \"descripcion\": \"Teclado en promoción\",\n      \"cantidad\": 1,\n      \"precioUnitario\": 1200.0,\n      \"porcentajeBonificacion\": 0,\n      \"porcentajeIva\": 21\n    }\n  ]\n}", "options": { "raw": { "language": "json" } } },
             "url": "{{baseUrl}}/api/facturas",
             "description": "Crea la factura 1002 sin cliente. En el reporte, COALESCE transforma el cliente nulo en Consumidor Final. El precio 1200 enviado reemplaza el precio por defecto de la lista para esta línea."
           },
           "event": [{ "listen": "test", "script": { "exec": [
             "pm.test('Factura Consumidor Final creada: HTTP 201', () => pm.response.to.have.status(201));",
-            "pm.test('Total calculado: 1200', () => pm.expect(pm.response.json().importeTotal).to.eql(1200));"
+            "pm.test('Neto más IVA calculado: 1452', () => pm.expect(pm.response.json().importeTotal).to.eql(1452));"
           ] } }]
         }
       ]
@@ -218,7 +218,7 @@
             "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
             "const body = pm.response.json();",
             "pm.test('Es un arreglo', () => pm.expect(body).to.be.an('array'));",
-            "pm.test('DTO con 7 campos', () => body.forEach(f => pm.expect(Object.keys(f).sort()).to.eql(['cantidadItems','clienteDenominacion','condicionIva','fechaEmision','importeTotal','numeroFactura','puntoVentaDescripcion'].sort())));",
+            "pm.test('DTO con id y estado para CRUD', () => body.forEach(f => pm.expect(Object.keys(f).sort()).to.eql(['id','cantidadItems','clienteDenominacion','condicionIva','estado','fechaEmision','importeTotal','numeroFactura','puntoVentaDescripcion'].sort())));",
             "pm.test('COALESCE devuelve Consumidor Final', () => pm.expect(body.find(f => f.numeroFactura === 1002).clienteDenominacion).to.eql('Consumidor Final'));"
           ] } }]
         },
@@ -287,7 +287,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-15\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"detalles\": [{\n    \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n    \"cantidad\": 1,\n    \"precioUnitario\": null\n  }]\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-15T10:00:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"detalles\": [{\n    \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n    \"cantidad\": 1,\n    \"precioUnitario\": null\n  }]\n}" },
             "url": "{{baseUrl}}/api/facturas",
             "description": "Intenta crear nuevamente la factura 1001. El servicio impide números duplicados y responde HTTP 400. Ejecutar después del request 11."
           },
@@ -326,6 +326,55 @@
           "name": "27 - Descargar Excel filtrado",
           "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas/reporte/excel?fechaDesde={{fechaDesde}}&fechaHasta={{fechaHasta}}&estado={{estado}}&montoMinimo={{montoMinimo}}", "description": "Genera el XLSX usando exactamente los mismos filtros que el JSON y el PDF." },
           "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200 y XLSX', () => { pm.response.to.have.status(200); pm.expect(pm.response.headers.get('Content-Type')).to.include('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); });"] } }]
+        }
+      ]
+    },
+    {
+      "name": "05 - Actualizar, anular y eliminar",
+      "description": "Ejecutar al final. Prueba PUT completo, anulación por estado, DELETE físico y 404.",
+      "item": [
+        {
+          "name": "28 - Actualizar cabecera e ítems",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-16T09:15:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 0,\n  \"observaciones\": \"Actualizada desde Postman\",\n  \"detalles\": [{\n    \"articuloId\": {{articuloId}},\n    \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n    \"cantidad\": 3,\n    \"precioUnitario\": null,\n    \"porcentajeBonificacion\": 10,\n    \"porcentajeIva\": 21\n  }]\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/facturas/{{facturaId}}",
+            "description": "Actualiza cabecera e ítems. El servicio recalcula neto, bonificación, IVA y total; retorna 200 OK."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Actualización: HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.test('Total recalculado: 4900.5', () => pm.expect(pm.response.json().importeTotal).to.eql(4900.5));"
+          ] } }]
+        },
+        {
+          "name": "29 - Anular factura",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"estado\": \"ANULADA\",\n  \"observaciones\": \"Anulada desde Postman\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/facturas/{{facturaId}}",
+            "description": "Actualización parcial: cambia estado a ANULADA y asigna fechaAnulacion; retorna 200 OK."
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Anulación: HTTP 200', () => pm.response.to.have.status(200));"] } }]
+        },
+        {
+          "name": "30 - Eliminar factura",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/facturas/{{facturaId}}",
+            "description": "Elimina físicamente la factura y sus detalles en cascada. Retorna 204 No Content."
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Eliminación: HTTP 204', () => pm.response.to.have.status(204));"] } }]
+        },
+        {
+          "name": "31 - Factura inexistente",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/facturas/999999999",
+            "description": "Comprueba el manejo de recurso no encontrado después de DELETE; retorna 404."
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('No encontrado: HTTP 404', () => pm.response.to.have.status(404));"] } }]
         }
       ]
     }

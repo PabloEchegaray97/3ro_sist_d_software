@@ -1,8 +1,7 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.FacturaCreacionDTO;
-import com.example.demo.dto.FacturaCreadaDTO;
 import com.example.demo.dto.FacturaReporteDTO;
+import com.example.demo.dto.FacturaRequestDTO;
 import com.example.demo.service.FacturaService;
 import com.example.demo.service.ReporteExportService;
 import lombok.RequiredArgsConstructor;
@@ -11,8 +10,12 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,6 +29,8 @@ import java.util.List;
 // CONSIGNA - PARTE 3.3: path base obligatorio del controlador REST.
 @RequestMapping("/api/facturas")
 @RequiredArgsConstructor
+// CONSIGNA ESCRITURA - 4.b: permite consumir la API desde el frontend local de Vite.
+@CrossOrigin(origins = "http://localhost:5173")
 public class FacturaRestController {
 
     private static final MediaType EXCEL_MEDIA_TYPE = MediaType.parseMediaType(
@@ -35,12 +40,31 @@ public class FacturaRestController {
     private final FacturaService facturaService;
     private final ReporteExportService reporteExportService;
 
+    // CONSIGNA ESCRITURA - 3.1: POST recibe Request DTO, crea en cascada
+    // y responde 201 Created con FacturaReporteDTO.
     @PostMapping
-    public ResponseEntity<FacturaCreadaDTO> crearFactura(
-            @RequestBody FacturaCreacionDTO solicitud
+    public ResponseEntity<FacturaReporteDTO> crearFactura(
+            @RequestBody FacturaRequestDTO solicitud
     ) {
-        FacturaCreadaDTO factura = facturaService.crearFactura(solicitud);
+        FacturaReporteDTO factura = facturaService.crear(solicitud);
         return ResponseEntity.status(201).body(factura);
+    }
+
+    // CONSIGNA ESCRITURA - 3.1: PUT actualiza cabecera, detalles o solamente
+    // estado/observaciones y responde 200 OK con el DTO actualizado.
+    @PutMapping("/{id}")
+    public ResponseEntity<FacturaReporteDTO> actualizarFactura(
+            @PathVariable Long id,
+            @RequestBody FacturaRequestDTO solicitud
+    ) {
+        return ResponseEntity.ok(facturaService.actualizar(id, solicitud));
+    }
+
+    // CONSIGNA ESCRITURA - 3.1: DELETE realiza eliminacion fisica y retorna 204.
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarFactura(@PathVariable Long id) {
+        facturaService.eliminar(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping

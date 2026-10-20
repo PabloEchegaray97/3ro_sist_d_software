@@ -10,6 +10,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Repository
 public class FacturaReporteRepository {
@@ -27,13 +28,15 @@ public class FacturaReporteRepository {
         // hacia FacturaReporteDTO, sin cargar entidades completas en memoria.
         StringBuilder jpql = new StringBuilder(
                 "SELECT new com.example.demo.dto.FacturaReporteDTO(" +
+                " f.id, " +
                 " f.numero, " +
                 " f.fechaEmision, " +
                 " COALESCE(c.denominacion, 'Consumidor Final'), " +
                 " ci.denominacion, " +
                 " pv.descripcion, " +
                 " f.importeTotal, " +
-                " COUNT(d)" +
+                " COUNT(d), " +
+                " f.estado" +
                 ") " +
                 "FROM FacturaVenta f " +
                 // LEFT JOIN permite que un cliente nulo se muestre como Consumidor Final.
@@ -69,7 +72,7 @@ public class FacturaReporteRepository {
         // la cantidad de detalles de cada factura.
         jpql.append(
                 "GROUP BY f.id, f.numero, f.fechaEmision, c.denominacion, " +
-                "ci.denominacion, pv.descripcion, f.importeTotal " +
+                "ci.denominacion, pv.descripcion, f.importeTotal, f.estado " +
                 "ORDER BY f.fechaEmision, f.numero"
         );
 
@@ -79,5 +82,27 @@ public class FacturaReporteRepository {
         );
         parametros.forEach(query::setParameter);
         return query.getResultList();
+    }
+
+    // CONSIGNA ESCRITURA - 3.1: construye el DTO de respuesta despues de POST o PUT.
+    public Optional<FacturaReporteDTO> buscarReportePorId(Long id) {
+        String jpql =
+                "SELECT new com.example.demo.dto.FacturaReporteDTO(" +
+                " f.id, f.numero, f.fechaEmision, " +
+                " COALESCE(c.denominacion, 'Consumidor Final'), " +
+                " ci.denominacion, pv.descripcion, f.importeTotal, COUNT(d), f.estado) " +
+                "FROM FacturaVenta f " +
+                "LEFT JOIN f.cliente c " +
+                "JOIN f.condicionIva ci " +
+                "JOIN f.puntoVenta pv " +
+                "JOIN f.detalles d " +
+                "WHERE f.id = :id " +
+                "GROUP BY f.id, f.numero, f.fechaEmision, c.denominacion, " +
+                "ci.denominacion, pv.descripcion, f.importeTotal, f.estado";
+
+        return entityManager.createQuery(jpql, FacturaReporteDTO.class)
+                .setParameter("id", id)
+                .getResultStream()
+                .findFirst();
     }
 }

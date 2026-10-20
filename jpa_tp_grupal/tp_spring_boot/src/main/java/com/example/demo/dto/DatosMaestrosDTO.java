@@ -36,6 +36,7 @@ public final class DatosMaestrosDTO {
             String celular,
             String nombreCalle,
             String numeroCalle,
+            Long condicionIvaId,
             Long usuarioId
     ) {
     }
