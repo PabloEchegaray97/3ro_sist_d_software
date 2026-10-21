@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.FacturaReporteDTO;
 import com.example.demo.dto.FacturaRequestDTO;
+import com.example.demo.dto.FacturaVistaDTO;
 import com.example.demo.service.FacturaService;
 import com.example.demo.service.ReporteExportService;
 import lombok.RequiredArgsConstructor;
@@ -79,6 +80,11 @@ public class FacturaRestController {
             @RequestParam(required = false) Double montoMinimo
     ) {
         return facturaService.buscarFacturasFiltradas(fechaDesde, fechaHasta, estado, montoMinimo);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<FacturaVistaDTO> obtenerFactura(@PathVariable Long id) {
+        return ResponseEntity.ok(facturaService.obtenerPorId(id));
     }
 
     @GetMapping(value = "/reporte/pdf", produces = MediaType.APPLICATION_PDF_VALUE)

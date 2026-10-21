@@ -7,6 +7,7 @@ import type {
   FacturaOpcionesDTO,
   FacturaReporteDTO,
   FacturaRequestDTO,
+  FacturaVistaDTO,
   OpcionDTO,
 } from "./models/factura.dto";
 import { FacturaService } from "./services/FacturaService";
@@ -219,7 +220,7 @@ function renderInvoices(): void {
     return;
   }
   body.innerHTML = facturas.map((invoice) => {
-    const status = invoice.estado?.trim() || "SIN ESTADO";
+    const status = invoice.estado.trim();
     const annulled = status.toUpperCase() === "ANULADA";
     const annulAction = annulled
       ? ""
@@ -230,7 +231,7 @@ function renderInvoices(): void {
       <td>${escapeHtml(invoice.clienteDenominacion)}</td><td>${escapeHtml(invoice.condicionIva)}</td>
       <td>${escapeHtml(invoice.puntoVentaDescripcion)}</td><td data-money>${money(invoice.importeTotal)}</td>
       <td>${invoice.cantidadItems}</td><td data-status="${annulled ? "anulada" : "emitida"}">${formatStatus(status)}</td>
-      <td><div data-actions>${annulAction}<button type="button" data-action="eliminar" data-id="${invoice.id}"><i class="ph ph-trash" aria-hidden="true"></i><span>Eliminar</span></button></div></td>
+      <td><div data-actions><button type="button" data-action="ver" data-id="${invoice.id}"><i class="ph ph-eye" aria-hidden="true"></i><span>Ver factura</span></button>${annulAction}<button type="button" data-action="eliminar" data-id="${invoice.id}"><i class="ph ph-trash" aria-hidden="true"></i><span>Eliminar</span></button></div></td>
     </tr>
   `;
   }).join("");
@@ -239,9 +240,75 @@ function renderInvoices(): void {
     button.addEventListener("click", () => {
       const invoice = facturas.find((item) => item.id === Number(button.dataset.id));
       if (!invoice) return;
+      if (button.dataset.action === "ver") {
+        void openInvoiceView(invoice.id);
+        return;
+      }
       openConfirmation(button.dataset.action as "anular" | "eliminar", invoice);
     });
   });
+}
+
+async function openInvoiceView(id: number): Promise<void> {
+  const dialog = byId<HTMLDialogElement>("factura-vista-modal");
+  const content = byId("factura-vista-contenido");
+  byId("factura-vista-titulo").textContent = "Detalle de factura";
+  content.innerHTML = '<p data-empty>Cargando factura…</p>';
+  dialog.showModal();
+  try {
+    const invoice = await service.obtenerFactura(id);
+    byId("factura-vista-titulo").textContent = `Factura ${invoice.numero}`;
+    content.innerHTML = invoiceViewHtml(invoice);
+  } catch (error) {
+    content.innerHTML = '<p data-empty>No se pudo cargar la factura.</p>';
+    showMessage(errorMessage(error), true);
+  }
+}
+
+function invoiceViewHtml(invoice: FacturaVistaDTO): string {
+  const cancelledDate = invoice.fechaAnulacion
+    ? `<div><dt>Fecha de anulación</dt><dd>${escapeHtml(invoice.fechaAnulacion)}</dd></div>`
+    : "";
+  const rows = invoice.detalles.map((detail) => `
+    <tr>
+      <td>${escapeHtml(detail.articuloCodigo)}<small>${escapeHtml(detail.articuloDenominacion)} · ID ${detail.articuloId}</small></td>
+      <td>${escapeHtml(detail.listaPrecio)}<small>ID ${detail.listaPrecioArticuloId}</small></td>
+      <td>${escapeHtml(detail.descripcion ?? "")}</td>
+      <td>${decimal(detail.cantidad)}</td>
+      <td data-money>${money(detail.precioUnitario)}</td>
+      <td>${decimal(detail.porcentajeBonificacion)} %</td>
+      <td>${decimal(detail.porcentajeIva)} %</td>
+      <td data-money>${money(detail.importeNeto)}</td>
+      <td data-money>${money(detail.importeIva)}</td>
+      <td data-money>${money(detail.importeSubtotal)}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <dl data-invoice-summary>
+      <div><dt>Número</dt><dd>${invoice.numero}</dd></div>
+      <div><dt>Fecha</dt><dd>${dateTimeHtml(invoice.fechaEmision)}</dd></div>
+      <div><dt>Estado</dt><dd data-status="${invoice.estado.toUpperCase() === "ANULADA" ? "anulada" : "emitida"}">${formatStatus(invoice.estado)}</dd></div>
+      <div><dt>Punto de venta</dt><dd>${escapeHtml(invoice.puntoVentaDescripcion)} · ID ${invoice.puntoVentaId}</dd></div>
+      <div><dt>Cliente</dt><dd>${escapeHtml(invoice.clienteDenominacion)}${invoice.clienteId == null ? "" : ` · ID ${invoice.clienteId}`}</dd></div>
+      <div><dt>Condición de IVA</dt><dd>${escapeHtml(invoice.condicionIva)} · ID ${invoice.condicionIvaId}</dd></div>
+      <div><dt>Moneda</dt><dd>${escapeHtml(invoice.tipoMoneda)} · ID ${invoice.tipoMonedaId}</dd></div>
+      <div><dt>Usuario</dt><dd>${escapeHtml(invoice.usuario)} · ID ${invoice.usuarioId}</dd></div>
+      ${cancelledDate}
+    </dl>
+    <div data-invoice-notes><span>Observaciones</span><p>${escapeHtml(invoice.observaciones || "Sin observaciones")}</p></div>
+    <div data-table>
+      <table data-invoice-details>
+        <thead><tr><th>Artículo</th><th>Lista</th><th>Descripción</th><th>Cantidad</th><th>Precio</th><th>Bonif.</th><th>IVA</th><th>Neto</th><th>IVA importe</th><th>Subtotal</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <dl data-invoice-totals>
+      <div><dt>Total</dt><dd>${money(invoice.importeTotal)}</dd></div>
+      <div><dt>Cobrado</dt><dd>${money(invoice.importeCobrado)}</dd></div>
+      <div><dt>Saldo</dt><dd>${money(invoice.importeSaldo)}</dd></div>
+    </dl>
+  `;
 }
 
 function openConfirmation(tipo: "anular" | "eliminar", factura: FacturaReporteDTO): void {
@@ -329,6 +396,7 @@ function showMessage(text: string, isError = false): void {
 }
 
 const money = (amount: number) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(amount);
+const decimal = (amount: number) => new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(amount);
 const roundMoney = (amount: number) => Math.round(amount * 100) / 100;
 const formatStatus = (status: string) => status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : "Ocurrió un error";
@@ -374,6 +442,7 @@ byId("abrir-nueva-factura").addEventListener("click", () => {
 byId("cerrar-nueva-factura").addEventListener("click", () => byId<HTMLDialogElement>("nueva-factura-modal").close());
 byId("abrir-filtros").addEventListener("click", () => byId<HTMLDialogElement>("filtros-modal").showModal());
 byId("cerrar-filtros").addEventListener("click", () => byId<HTMLDialogElement>("filtros-modal").close());
+byId("cerrar-factura-vista").addEventListener("click", () => byId<HTMLDialogElement>("factura-vista-modal").close());
 byId("agregar-detalle").addEventListener("click", addSelectedArticle);
 byId("cliente-id").addEventListener("change", syncClientTaxCondition);
 byId<HTMLFormElement>("form-factura").addEventListener("submit", (event) => void createInvoice(event));

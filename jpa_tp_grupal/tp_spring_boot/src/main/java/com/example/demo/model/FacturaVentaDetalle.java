@@ -40,6 +40,7 @@ public class FacturaVentaDetalle extends EntityId {
     private double precioUnitario;
 
     private double porcentajeBonificacion;
+    private double porcentajeIva;
     private double importeNeto;
     private double importeIva;
 

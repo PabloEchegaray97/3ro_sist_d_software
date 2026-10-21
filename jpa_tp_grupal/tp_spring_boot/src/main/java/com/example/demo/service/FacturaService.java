@@ -1,8 +1,10 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.FacturaDetalleRequestDTO;
+import com.example.demo.dto.FacturaDetalleVistaDTO;
 import com.example.demo.dto.FacturaReporteDTO;
 import com.example.demo.dto.FacturaRequestDTO;
+import com.example.demo.dto.FacturaVistaDTO;
 import com.example.demo.exception.RecursoNoEncontradoException;
 import com.example.demo.model.Articulo;
 import com.example.demo.model.Cliente;
@@ -48,6 +50,66 @@ public class FacturaService {
         }
         return facturaReporteRepository.buscarFacturasFiltradas(
                 fechaDesde, fechaHasta, estado, montoMinimo
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public FacturaVistaDTO obtenerPorId(Long id) {
+        FacturaVenta factura = facturaEscrituraRepository.buscarFactura(id);
+        Cliente cliente = factura.getCliente();
+        Usuario usuario = factura.getUsuarioCarga();
+
+        List<FacturaDetalleVistaDTO> detalles = factura.getDetalles().stream()
+                .map(detalle -> {
+                    ListaPrecioArticulo precio = detalle.getListaPrecioArticulo();
+                    Articulo articulo = precio.getArticulo();
+                    double porcentajeIva = detalle.getPorcentajeIva();
+                    if (porcentajeIva == 0 && detalle.getImporteNeto() != 0
+                            && detalle.getImporteIva() != 0) {
+                        porcentajeIva = redondear(
+                                detalle.getImporteIva() * 100 / detalle.getImporteNeto()
+                        );
+                    }
+                    return new FacturaDetalleVistaDTO(
+                            detalle.getId(),
+                            articulo.getId(),
+                            articulo.getCodigo(),
+                            articulo.getDenominacion(),
+                            precio.getId(),
+                            precio.getListaPrecio().getDenominacion(),
+                            detalle.getDescripcion(),
+                            detalle.getCantidad(),
+                            detalle.getPrecioUnitario(),
+                            detalle.getPorcentajeBonificacion(),
+                            porcentajeIva,
+                            detalle.getImporteNeto(),
+                            detalle.getImporteIva(),
+                            detalle.getImporteSubtotal()
+                    );
+                })
+                .toList();
+
+        return new FacturaVistaDTO(
+                factura.getId(),
+                factura.getNumero(),
+                factura.getFechaEmision(),
+                factura.getPuntoVenta().getId(),
+                factura.getPuntoVenta().getDescripcion(),
+                cliente == null ? null : cliente.getId(),
+                cliente == null ? "Consumidor Final" : cliente.getDenominacion(),
+                factura.getCondicionIva().getId(),
+                factura.getCondicionIva().getDenominacion(),
+                factura.getTipoMoneda().getId(),
+                factura.getTipoMoneda().getDenominacion(),
+                usuario.getId(),
+                usuario.getUsuario(),
+                factura.getEstado(),
+                factura.getImporteCobrado(),
+                factura.getImporteSaldo(),
+                factura.getImporteTotal(),
+                factura.getObservaciones(),
+                factura.getFechaAnulacion(),
+                detalles
         );
     }
 
@@ -240,6 +302,7 @@ public class FacturaService {
             detalle.setCantidad(solicitud.getCantidad());
             detalle.setPrecioUnitario(precioUnitario);
             detalle.setPorcentajeBonificacion(bonificacion);
+            detalle.setPorcentajeIva(porcentajeIva);
             detalle.setImporteNeto(importeNeto);
             detalle.setImporteIva(importeIva);
             detalle.setImporteSubtotal(subtotal);

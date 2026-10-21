@@ -149,6 +149,8 @@ La API queda disponible en `http://localhost:8080/api/facturas`.
 
 - `GET /api/facturas`: consulta DTOs y acepta `fechaDesde`, `fechaHasta`,
   `estado` y `montoMinimo`.
+- `GET /api/facturas/{id}`: devuelve la cabecera, importes y todos los detalles
+  registrados de una factura para la vista completa del frontend.
 - `POST /api/facturas`: alta en cascada.
 - `PUT /api/facturas/{id}`: actualización completa o parcial/anulación.
 - `DELETE /api/facturas/{id}`: eliminación física.
