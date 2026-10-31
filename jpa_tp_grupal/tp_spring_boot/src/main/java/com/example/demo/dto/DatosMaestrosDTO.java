@@ -37,8 +37,12 @@ public final class DatosMaestrosDTO {
             String nombreCalle,
             String numeroCalle,
             Long condicionIvaId,
+            Long listaPrecioId,
             Long usuarioId
     ) {
+    }
+
+    public record ClienteListaPrecioRequest(Long listaPrecioId, Long usuarioId) {
     }
 
     public record RubroRequest(Integer codigo, String denominacion, Long usuarioId) {

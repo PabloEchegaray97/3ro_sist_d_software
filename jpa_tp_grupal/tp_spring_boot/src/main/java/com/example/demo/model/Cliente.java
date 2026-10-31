@@ -34,6 +34,11 @@ public class Cliente extends AuditoriaApp {
     @EqualsAndHashCode.Exclude
     private CondicionIva condicionIva;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lista_precio_predeterminada_id")
+    @EqualsAndHashCode.Exclude
+    private ListaPrecio listaPrecioPredeterminada;
+
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false)
     @JoinColumn(name = "contacto_id", nullable = false)
     @EqualsAndHashCode.Exclude

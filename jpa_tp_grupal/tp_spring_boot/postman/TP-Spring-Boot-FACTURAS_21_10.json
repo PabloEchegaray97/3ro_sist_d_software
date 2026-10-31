@@ -15,8 +15,10 @@
     { "key": "rubroId", "value": "" },
     { "key": "marcaId", "value": "" },
     { "key": "listaPrecioId", "value": "" },
+    { "key": "listaPrecioMayoristaId", "value": "" },
     { "key": "articuloId", "value": "" },
     { "key": "listaPrecioArticuloId", "value": "" },
+    { "key": "listaPrecioArticuloMayoristaId", "value": "" },
     { "key": "facturaId", "value": "" },
     { "key": "fechaDesde", "value": "2026-01-01" },
     { "key": "fechaHasta", "value": "2026-12-31" },
@@ -90,7 +92,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"cuitCuil\": \"30-12345678-9\",\n  \"denominacion\": \"Empresa Tech S.A.\",\n  \"email\": \"contacto@empresa-tech.com\",\n  \"telefono\": \"2614000000\",\n  \"celular\": \"2615000000\",\n  \"nombreCalle\": \"San Martin\",\n  \"numeroCalle\": \"100\",\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"cuitCuil\": \"30-12345678-9\",\n  \"denominacion\": \"Empresa Tech S.A.\",\n  \"email\": \"contacto@empresa-tech.com\",\n  \"telefono\": \"2614000000\",\n  \"celular\": \"2615000000\",\n  \"nombreCalle\": \"San Martin\",\n  \"numeroCalle\": \"100\",\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"listaPrecioId\": null,\n  \"usuarioId\": {{usuarioId}}\n}" },
             "url": "{{baseUrl}}/api/datos-maestros/clientes",
             "description": "Crea cliente, contacto y domicilio, y lo vincula con {{condicionIvaId}}. Guarda el ID en {{clienteId}}. En una factura puede enviarse clienteId null para obtener Consumidor Final."
           },
@@ -128,21 +130,48 @@
           ] } }]
         },
         {
-          "name": "08 - Crear lista de precios",
+          "name": "08 - Crear lista de precios minorista",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"LP-GENERAL\",\n  \"denominacion\": \"Lista General\",\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"MINORISTA\",\n  \"denominacion\": \"Precio minorista\",\n  \"usuarioId\": {{usuarioId}}\n}" },
             "url": "{{baseUrl}}/api/datos-maestros/listas-precio",
-            "description": "Crea la lista que contendrá el precio utilizado por el detalle. Guarda el ID en {{listaPrecioId}}."
+            "description": "Crea la lista minorista utilizada por Consumidor Final. Guarda el ID en {{listaPrecioId}}."
           },
           "event": [{ "listen": "test", "script": { "exec": [
-            "pm.test('Lista creada: HTTP 201', () => pm.response.to.have.status(201));",
+            "pm.test('Lista minorista creada: HTTP 201', () => pm.response.to.have.status(201));",
             "const body = pm.response.json(); pm.collectionVariables.set('listaPrecioId', body.id);"
           ] } }]
         },
         {
-          "name": "09 - Crear artículo",
+          "name": "09 - Crear lista de precios mayorista",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"MAYORISTA\",\n  \"denominacion\": \"Precio mayorista\",\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/listas-precio",
+            "description": "Crea la segunda lista sin calcularla como descuento. Guarda el ID en {{listaPrecioMayoristaId}}."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Lista mayorista creada: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('listaPrecioMayoristaId', body.id);"
+          ] } }]
+        },
+        {
+          "name": "10 - Asignar lista mayorista al cliente",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"listaPrecioId\": {{listaPrecioMayoristaId}},\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/clientes/{{clienteId}}/lista-precio",
+            "description": "Define la lista mayorista como predeterminada del cliente. La factura la propone automáticamente, pero permite cambiarla."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Lista del cliente actualizada: HTTP 200', () => pm.response.to.have.status(200));"
+          ] } }]
+        },
+        {
+          "name": "11 - Crear artículo",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
@@ -156,17 +185,31 @@
           ] } }]
         },
         {
-          "name": "10 - Asignar precio al artículo",
+          "name": "12 - Asignar precio minorista al artículo",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"listaPrecioId\": {{listaPrecioId}},\n  \"articuloId\": {{articuloId}},\n  \"precioVenta\": 1500.0,\n  \"usuarioId\": {{usuarioId}}\n}" },
             "url": "{{baseUrl}}/api/datos-maestros/precios-articulo",
-            "description": "Relaciona el artículo con la lista y define su precio por defecto. El detalle de factura referencia esta relación. Guarda el ID en {{listaPrecioArticuloId}}."
+            "description": "Define el precio minorista del artículo. Guarda el ID en {{listaPrecioArticuloId}}."
           },
           "event": [{ "listen": "test", "script": { "exec": [
-            "pm.test('Precio creado: HTTP 201', () => pm.response.to.have.status(201));",
+            "pm.test('Precio minorista creado: HTTP 201', () => pm.response.to.have.status(201));",
             "const body = pm.response.json(); pm.collectionVariables.set('listaPrecioArticuloId', body.id);"
+          ] } }]
+        },
+        {
+          "name": "13 - Asignar precio mayorista al artículo",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"listaPrecioId\": {{listaPrecioMayoristaId}},\n  \"articuloId\": {{articuloId}},\n  \"precioVenta\": 1250.0,\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "url": "{{baseUrl}}/api/datos-maestros/precios-articulo",
+            "description": "Define un precio mayorista independiente para el mismo artículo. Guarda el ID en {{listaPrecioArticuloMayoristaId}}."
+          },
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Precio mayorista creado: HTTP 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json(); pm.collectionVariables.set('listaPrecioArticuloMayoristaId', body.id);"
           ] } }]
         }
       ]
@@ -180,14 +223,14 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-15T10:00:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 3000.0,\n  \"observaciones\": \"Factura creada desde Postman\",\n  \"detalles\": [\n    {\n      \"articuloId\": {{articuloId}},\n      \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n      \"descripcion\": \"Dos teclados mecánicos\",\n      \"cantidad\": 2,\n      \"precioUnitario\": null,\n      \"porcentajeBonificacion\": 0,\n      \"porcentajeIva\": 21\n    }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-15T10:00:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"listaPrecioId\": {{listaPrecioMayoristaId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 3000.0,\n  \"observaciones\": \"Factura creada desde Postman\",\n  \"detalles\": [\n    {\n      \"articuloId\": {{articuloId}},\n      \"listaPrecioArticuloId\": {{listaPrecioArticuloMayoristaId}},\n      \"descripcion\": \"Dos teclados mecánicos\",\n      \"cantidad\": 2,\n      \"precioUnitario\": null,\n      \"porcentajeBonificacion\": 0,\n      \"porcentajeIva\": 21\n    }\n  ]\n}", "options": { "raw": { "language": "json" } } },
             "url": "{{baseUrl}}/api/facturas",
-            "description": "Crea la factura 1001 para Empresa Tech. Usa precio de lista 1500 y calcula neto 3000, IVA 630 y total 3630. cantidadItems es 1 porque COUNT(d) cuenta líneas, no unidades."
+            "description": "Crea la factura 1001 para Empresa Tech con su lista mayorista. Usa precio 1250 y calcula neto 2500, IVA 525 y total 3025."
           },
           "event": [{ "listen": "test", "script": { "exec": [
             "pm.test('Factura creada: HTTP 201', () => pm.response.to.have.status(201));",
             "const body = pm.response.json(); pm.collectionVariables.set('facturaId', body.id);",
-            "pm.test('Neto más IVA calculado: 3630', () => pm.expect(body.importeTotal).to.eql(3630));",
+            "pm.test('Neto más IVA calculado: 3025', () => pm.expect(body.importeTotal).to.eql(3025));",
             "pm.test('Una línea de detalle', () => pm.expect(body.cantidadItems).to.eql(1));"
           ] } }]
         },
@@ -196,13 +239,13 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1002,\n  \"fechaEmision\": \"2026-03-20T11:30:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": null,\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 0,\n  \"observaciones\": \"Venta sin cliente asociado\",\n  \"detalles\": [\n    {\n      \"articuloId\": {{articuloId}},\n      \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n      \"descripcion\": \"Teclado en promoción\",\n      \"cantidad\": 1,\n      \"precioUnitario\": 1200.0,\n      \"porcentajeBonificacion\": 0,\n      \"porcentajeIva\": 21\n    }\n  ]\n}", "options": { "raw": { "language": "json" } } },
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1002,\n  \"fechaEmision\": \"2026-03-20T11:30:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": null,\n  \"listaPrecioId\": {{listaPrecioId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 0,\n  \"observaciones\": \"Venta sin cliente asociado\",\n  \"detalles\": [\n    {\n      \"articuloId\": {{articuloId}},\n      \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n      \"descripcion\": \"Teclado en promoción\",\n      \"cantidad\": 1,\n      \"precioUnitario\": null,\n      \"porcentajeBonificacion\": 0,\n      \"porcentajeIva\": 21\n    }\n  ]\n}", "options": { "raw": { "language": "json" } } },
             "url": "{{baseUrl}}/api/facturas",
-            "description": "Crea la factura 1002 sin cliente. En el reporte, COALESCE transforma el cliente nulo en Consumidor Final. El precio 1200 enviado reemplaza el precio por defecto de la lista para esta línea."
+            "description": "Crea la factura 1002 sin cliente y aplica la lista minorista configurada para Consumidor Final."
           },
           "event": [{ "listen": "test", "script": { "exec": [
             "pm.test('Factura Consumidor Final creada: HTTP 201', () => pm.response.to.have.status(201));",
-            "pm.test('Neto más IVA calculado: 1452', () => pm.expect(pm.response.json().importeTotal).to.eql(1452));"
+            "pm.test('Neto más IVA calculado: 1815', () => pm.expect(pm.response.json().importeTotal).to.eql(1815));"
           ] } }]
         }
       ]
@@ -287,7 +330,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-15T10:00:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"detalles\": [{\n    \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n    \"cantidad\": 1,\n    \"precioUnitario\": null\n  }]\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-15T10:00:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"listaPrecioId\": {{listaPrecioId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"detalles\": [{\n    \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n    \"cantidad\": 1,\n    \"precioUnitario\": null\n  }]\n}" },
             "url": "{{baseUrl}}/api/facturas",
             "description": "Intenta crear nuevamente la factura 1001. El servicio impide números duplicados y responde HTTP 400. Ejecutar después del request 11."
           },
@@ -338,7 +381,7 @@
           "request": {
             "method": "PUT",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-16T09:15:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 0,\n  \"observaciones\": \"Actualizada desde Postman\",\n  \"detalles\": [{\n    \"articuloId\": {{articuloId}},\n    \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n    \"cantidad\": 3,\n    \"precioUnitario\": null,\n    \"porcentajeBonificacion\": 10,\n    \"porcentajeIva\": 21\n  }]\n}", "options": { "raw": { "language": "json" } } },
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": 1001,\n  \"fechaEmision\": \"2026-03-16T09:15:00\",\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": {{clienteId}},\n  \"listaPrecioId\": {{listaPrecioId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"estado\": \"EMITIDA\",\n  \"importeCobrado\": 0,\n  \"observaciones\": \"Actualizada desde Postman\",\n  \"detalles\": [{\n    \"articuloId\": {{articuloId}},\n    \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n    \"cantidad\": 3,\n    \"precioUnitario\": null,\n    \"porcentajeBonificacion\": 10,\n    \"porcentajeIva\": 21\n  }]\n}", "options": { "raw": { "language": "json" } } },
             "url": "{{baseUrl}}/api/facturas/{{facturaId}}",
             "description": "Actualiza cabecera e ítems. El servicio recalcula neto, bonificación, IVA y total; retorna 200 OK."
           },

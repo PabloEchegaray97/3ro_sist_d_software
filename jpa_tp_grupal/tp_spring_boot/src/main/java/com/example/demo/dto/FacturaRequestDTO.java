@@ -20,6 +20,7 @@ public class FacturaRequestDTO {
     private LocalDateTime fechaEmision;
     private Long puntoVentaId;
     private Long clienteId;
+    private Long listaPrecioId;
     private Long condicionIvaId;
     private Long tipoMonedaId;
     private Long usuarioId;

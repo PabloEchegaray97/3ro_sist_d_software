@@ -15,5 +15,7 @@ public class ClienteCondicionIvaMigration implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         datosMaestrosService.migrarCondicionIvaClientesExistentes();
+        datosMaestrosService.prepararCatalogoPreciosInicial();
+        datosMaestrosService.migrarListaPrecioClientesExistentes();
     }
 }

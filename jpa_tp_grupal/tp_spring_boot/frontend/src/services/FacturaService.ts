@@ -1,11 +1,18 @@
 import type {
+  ArticuloAltaOpcionesDTO,
+  ArticuloAltaRequestDTO,
+  ArticuloAltaOpcionDTO,
+  ArticuloAltaListaPrecioOpcionDTO,
   ArticuloDisponibleDTO,
+  ClienteDisponibleDTO,
+  PaginaDTO,
   FacturaDetalleVistaDTO,
   FacturaOpcionesDTO,
   FacturaFiltrosDTO,
   FacturaReporteDTO,
   FacturaRequestDTO,
   FacturaVistaDTO,
+  EntidadCreadaDTO,
 } from "../models/factura.dto";
 
 interface ApiError {
@@ -68,11 +75,24 @@ const facturaDetalleVistaFields = [
 
 const facturaVistaFields = [
   "id", "numero", "fechaEmision", "puntoVentaId", "puntoVentaDescripcion",
-  "clienteId", "clienteDenominacion", "condicionIvaId", "condicionIva",
+  "clienteId", "clienteDenominacion", "listaPrecioId", "listaPrecioCodigo", "listaPrecio",
+  "condicionIvaId", "condicionIva",
   "tipoMonedaId", "tipoMoneda", "usuarioId", "usuario", "estado",
   "importeCobrado", "importeSaldo", "importeTotal", "observaciones",
   "fechaAnulacion", "detalles",
 ] as const satisfies readonly (keyof FacturaVistaDTO)[];
+
+const articuloAltaOpcionesFields = [
+  "rubros", "marcas", "listasPrecio", "usuario",
+] as const satisfies readonly (keyof ArticuloAltaOpcionesDTO)[];
+
+const articuloAltaOpcionFields = [
+  "id", "descripcion",
+] as const satisfies readonly (keyof ArticuloAltaOpcionDTO)[];
+
+const articuloAltaListaFields = [
+  "id", "codigo", "denominacion",
+] as const satisfies readonly (keyof ArticuloAltaListaPrecioOpcionDTO)[];
 
 function exactFields(value: unknown, fields: readonly string[], dtoName: string): JsonObject {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -102,17 +122,104 @@ function facturaVistaDTO(value: unknown): FacturaVistaDTO {
   return dto as unknown as FacturaVistaDTO;
 }
 
+function articuloAltaOpcionDTO(value: unknown): ArticuloAltaOpcionDTO {
+  const dto = exactFields(value, articuloAltaOpcionFields, "ArticuloAltaDTO.Opcion");
+  if (typeof dto.id !== "number" || typeof dto.descripcion !== "string") {
+    throw new Error("Los tipos de ArticuloAltaDTO.Opcion no coinciden entre Java y TypeScript");
+  }
+  return dto as unknown as ArticuloAltaOpcionDTO;
+}
+
+function articuloAltaListaDTO(value: unknown): ArticuloAltaListaPrecioOpcionDTO {
+  const dto = exactFields(value, articuloAltaListaFields, "ArticuloAltaDTO.ListaPrecioOpcion");
+  if (typeof dto.id !== "number" || typeof dto.codigo !== "string"
+      || typeof dto.denominacion !== "string") {
+    throw new Error("Los tipos de ListaPrecioOpcion no coinciden entre Java y TypeScript");
+  }
+  return dto as unknown as ArticuloAltaListaPrecioOpcionDTO;
+}
+
+function articuloAltaOpcionesDTO(value: unknown): ArticuloAltaOpcionesDTO {
+  const dto = exactFields(value, articuloAltaOpcionesFields, "ArticuloAltaDTO.Opciones");
+  if (!Array.isArray(dto.rubros) || !Array.isArray(dto.marcas)
+      || !Array.isArray(dto.listasPrecio)) {
+    throw new Error("Las opciones de alta de artículo no contienen arreglos válidos");
+  }
+  dto.rubros.forEach(articuloAltaOpcionDTO);
+  dto.marcas.forEach(articuloAltaOpcionDTO);
+  dto.listasPrecio.forEach(articuloAltaListaDTO);
+  if (dto.usuario !== null) articuloAltaOpcionDTO(dto.usuario);
+  return dto as unknown as ArticuloAltaOpcionesDTO;
+}
+
+function entidadCreadaDTO(value: unknown): EntidadCreadaDTO {
+  const dto = exactFields(value, ["id", "descripcion"], "EntidadCreadaDTO");
+  if (typeof dto.id !== "number" || typeof dto.descripcion !== "string") {
+    throw new Error("Los tipos de EntidadCreadaDTO no coinciden entre Java y TypeScript");
+  }
+  return dto as unknown as EntidadCreadaDTO;
+}
+
 // CONSIGNA ESCRITURA - 4.b y 6.a: cliente HTTP centralizado para la API REST.
 export class FacturaService {
   private readonly url = "http://localhost:8080/api/facturas";
   private readonly datosMaestrosUrl = "http://localhost:8080/api/datos-maestros";
 
-  async obtenerArticulosDisponibles(): Promise<ArticuloDisponibleDTO[]> {
-    return this.solicitar<ArticuloDisponibleDTO[]>(`${this.datosMaestrosUrl}/precios-articulo`);
+  async buscarArticulosDisponibles(
+    busqueda: string,
+    pagina: number,
+    tamanio: number,
+    listaPrecioId: number,
+  ): Promise<PaginaDTO<ArticuloDisponibleDTO>> {
+    const parametros = new URLSearchParams({
+      busqueda,
+      pagina: String(pagina),
+      tamanio: String(tamanio),
+      listaPrecioId: String(listaPrecioId),
+    });
+    return this.solicitar<PaginaDTO<ArticuloDisponibleDTO>>(
+      `${this.datosMaestrosUrl}/precios-articulo?${parametros.toString()}`,
+    );
+  }
+
+  async buscarClientesDisponibles(
+    busqueda: string,
+    pagina: number,
+    tamanio: number,
+    orden: string,
+  ): Promise<PaginaDTO<ClienteDisponibleDTO>> {
+    const parametros = new URLSearchParams({
+      busqueda,
+      pagina: String(pagina),
+      tamanio: String(tamanio),
+      orden,
+    });
+    return this.solicitar<PaginaDTO<ClienteDisponibleDTO>>(
+      `${this.datosMaestrosUrl}/clientes-disponibles?${parametros.toString()}`,
+    );
   }
 
   async obtenerOpcionesFactura(): Promise<FacturaOpcionesDTO> {
     return this.solicitar<FacturaOpcionesDTO>(`${this.datosMaestrosUrl}/opciones-factura`);
+  }
+
+  async obtenerOpcionesAltaArticulo(): Promise<ArticuloAltaOpcionesDTO> {
+    const response = await this.solicitar<unknown>(`${this.datosMaestrosUrl}/articulos/opciones`);
+    return articuloAltaOpcionesDTO(response);
+  }
+
+  async crearArticuloConPrecios(
+    articulo: ArticuloAltaRequestDTO,
+  ): Promise<EntidadCreadaDTO> {
+    const response = await this.solicitar<unknown>(
+      `${this.datosMaestrosUrl}/articulos-con-precios`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(articulo),
+      },
+    );
+    return entidadCreadaDTO(response);
   }
 
   // CONSIGNA ESCRITURA - 6.b: GET con filtros opcionales.
@@ -133,6 +240,15 @@ export class FacturaService {
   async crearFactura(factura: FacturaRequestDTO): Promise<FacturaReporteDTO> {
     const response = await this.solicitar<unknown>(this.url, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(factura),
+    });
+    return facturaReporteDTO(response);
+  }
+
+  async actualizarFactura(id: number, factura: FacturaRequestDTO): Promise<FacturaReporteDTO> {
+    const response = await this.solicitar<unknown>(`${this.url}/${id}`, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(factura),
     });

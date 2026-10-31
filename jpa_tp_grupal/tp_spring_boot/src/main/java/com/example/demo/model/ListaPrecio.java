@@ -18,7 +18,7 @@ import lombok.Setter;
 @EqualsAndHashCode(callSuper = true)
 public class ListaPrecio extends AuditoriaApp {
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String codigo;
 
     @Column(nullable = false)

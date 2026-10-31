@@ -3,18 +3,22 @@ package com.example.demo.controller;
 import com.example.demo.dto.DatosMaestrosDTO;
 import com.example.demo.dto.EntidadCreadaDTO;
 import com.example.demo.dto.ArticuloDisponibleDTO;
+import com.example.demo.dto.ArticuloAltaDTO;
+import com.example.demo.dto.ClienteDisponibleDTO;
+import com.example.demo.dto.PaginaDTO;
 import com.example.demo.dto.FacturaOpcionesDTO;
 import com.example.demo.service.DatosMaestrosService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/datos-maestros")
@@ -25,13 +29,33 @@ public class DatosMaestrosRestController {
     private final DatosMaestrosService service;
 
     @GetMapping("/precios-articulo")
-    public List<ArticuloDisponibleDTO> buscarArticulosDisponibles() {
-        return service.buscarArticulosDisponibles();
+    public PaginaDTO<ArticuloDisponibleDTO> buscarArticulosDisponibles(
+            @RequestParam(defaultValue = "") String busqueda,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "8") int tamanio,
+            @RequestParam(required = false) Long listaPrecioId
+    ) {
+        return service.buscarArticulosDisponibles(busqueda, pagina, tamanio, listaPrecioId);
+    }
+
+    @GetMapping("/clientes-disponibles")
+    public PaginaDTO<ClienteDisponibleDTO> buscarClientesDisponibles(
+            @RequestParam(defaultValue = "") String busqueda,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "8") int tamanio,
+            @RequestParam(defaultValue = "ULTIMOS_AGREGADOS") String orden
+    ) {
+        return service.buscarClientesDisponibles(busqueda, pagina, tamanio, orden);
     }
 
     @GetMapping("/opciones-factura")
     public FacturaOpcionesDTO buscarOpcionesFactura() {
         return service.buscarOpcionesFactura();
+    }
+
+    @GetMapping("/articulos/opciones")
+    public ArticuloAltaDTO.Opciones buscarOpcionesAltaArticulo() {
+        return service.buscarOpcionesAltaArticulo();
     }
 
     @PostMapping("/usuarios")
@@ -69,6 +93,14 @@ public class DatosMaestrosRestController {
         return creado(service.crearCliente(request));
     }
 
+    @PutMapping("/clientes/{clienteId}/lista-precio")
+    public EntidadCreadaDTO actualizarListaPrecioCliente(
+            @PathVariable Long clienteId,
+            @RequestBody DatosMaestrosDTO.ClienteListaPrecioRequest request
+    ) {
+        return service.actualizarListaPrecioCliente(clienteId, request);
+    }
+
     @PostMapping("/rubros")
     public ResponseEntity<EntidadCreadaDTO> crearRubro(
             @RequestBody DatosMaestrosDTO.RubroRequest request
@@ -95,6 +127,13 @@ public class DatosMaestrosRestController {
             @RequestBody DatosMaestrosDTO.ArticuloRequest request
     ) {
         return creado(service.crearArticulo(request));
+    }
+
+    @PostMapping("/articulos-con-precios")
+    public ResponseEntity<EntidadCreadaDTO> crearArticuloConPrecios(
+            @RequestBody ArticuloAltaDTO.CrearRequest request
+    ) {
+        return creado(service.crearArticuloConPrecios(request));
     }
 
     @PostMapping("/precios-articulo")

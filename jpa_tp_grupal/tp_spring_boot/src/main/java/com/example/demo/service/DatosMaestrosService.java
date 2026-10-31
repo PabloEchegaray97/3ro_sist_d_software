@@ -3,6 +3,9 @@ package com.example.demo.service;
 import com.example.demo.dto.DatosMaestrosDTO;
 import com.example.demo.dto.EntidadCreadaDTO;
 import com.example.demo.dto.ArticuloDisponibleDTO;
+import com.example.demo.dto.ArticuloAltaDTO;
+import com.example.demo.dto.ClienteDisponibleDTO;
+import com.example.demo.dto.PaginaDTO;
 import com.example.demo.dto.FacturaOpcionesDTO;
 import com.example.demo.model.Articulo;
 import com.example.demo.model.AuditoriaApp;
@@ -23,7 +26,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class DatosMaestrosService {
@@ -97,22 +102,421 @@ public class DatosMaestrosService {
                 });
     }
 
-    @Transactional(readOnly = true)
-    public List<ArticuloDisponibleDTO> buscarArticulosDisponibles() {
+    @Transactional
+    public int migrarListaPrecioClientesExistentes() {
+        ListaPrecio listaMinorista = buscarListaPrecioMinorista();
+        if (listaMinorista == null) {
+            return 0;
+        }
+        List<Cliente> clientesSinLista = entityManager.createQuery(
+                "SELECT c FROM Cliente c WHERE c.listaPrecioPredeterminada IS NULL",
+                Cliente.class
+        ).getResultList();
+        clientesSinLista.forEach(cliente -> cliente.setListaPrecioPredeterminada(listaMinorista));
+        return clientesSinLista.size();
+    }
+
+    private ListaPrecio buscarListaPrecioMinorista() {
         return entityManager.createQuery("""
+                SELECT lista
+                FROM ListaPrecio lista
+                ORDER BY CASE
+                    WHEN UPPER(lista.codigo) = 'MINORISTA' THEN 0
+                    WHEN LOWER(lista.denominacion) LIKE '%minorista%' THEN 1
+                    ELSE 2
+                END, lista.id
+                """, ListaPrecio.class)
+                .setMaxResults(1)
+                .getResultStream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    @Transactional
+    public void prepararCatalogoPreciosInicial() {
+        Usuario admin = entityManager.createQuery(
+                        "SELECT u FROM Usuario u WHERE LOWER(u.usuario) = 'admin' ORDER BY u.id",
+                        Usuario.class
+                ).setMaxResults(1)
+                .getResultStream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "No existe el usuario admin para preparar las listas de precios"
+                ));
+
+        ListaPrecio minorista = buscarListaPorCodigo("MINORISTA");
+        List<ListaPrecio> listasGenerales = entityManager.createQuery("""
+                SELECT lista
+                FROM ListaPrecio lista
+                WHERE UPPER(lista.codigo) IN ('LP-GENERAL', 'GENERAL')
+                   OR LOWER(lista.denominacion) = 'lista general'
+                ORDER BY lista.id
+                """, ListaPrecio.class).getResultList();
+
+        if (minorista == null && !listasGenerales.isEmpty()) {
+            minorista = listasGenerales.remove(0);
+            minorista.setCodigo("MINORISTA");
+            minorista.setDenominacion("Precio minorista");
+            actualizarAuditoria(minorista, admin);
+        }
+        if (minorista == null) {
+            minorista = crearListaPrecio("MINORISTA", "Precio minorista", admin);
+        }
+        for (ListaPrecio listaGeneral : listasGenerales) {
+            if (!listaGeneral.getId().equals(minorista.getId())) {
+                fusionarListaPrecio(listaGeneral, minorista);
+            }
+        }
+
+        ListaPrecio mayorista = buscarListaPorCodigo("MAYORISTA");
+        if (mayorista == null) {
+            mayorista = crearListaPrecio("MAYORISTA", "Precio mayorista", admin);
+        }
+
+        Rubro rubro = buscarOCrearRubroCatalogo(admin);
+        Marca marca = buscarOCrearMarcaCatalogo(admin);
+        List<ArticuloSemilla> articulos = List.of(
+                new ArticuloSemilla("ART-001", "Teclado mecánico", 45000, 39000),
+                new ArticuloSemilla("ART-002", "Mouse inalámbrico", 25000, 21500),
+                new ArticuloSemilla("ART-003", "Monitor 24 pulgadas", 180000, 158000),
+                new ArticuloSemilla("ART-004", "Auriculares USB", 38000, 32500),
+                new ArticuloSemilla("ART-005", "Webcam Full HD", 52000, 44500)
+        );
+
+        for (ArticuloSemilla datos : articulos) {
+            Articulo articulo = buscarOCrearArticulo(datos, rubro, marca, admin);
+            crearPrecioSiFalta(minorista, articulo, datos.precioMinorista(), admin);
+            crearPrecioSiFalta(mayorista, articulo, datos.precioMayorista(), admin);
+        }
+        entityManager.flush();
+    }
+
+    private ListaPrecio buscarListaPorCodigo(String codigo) {
+        return entityManager.createQuery(
+                        "SELECT lista FROM ListaPrecio lista WHERE UPPER(lista.codigo) = :codigo ORDER BY lista.id",
+                        ListaPrecio.class
+                ).setParameter("codigo", codigo)
+                .setMaxResults(1)
+                .getResultStream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    private ListaPrecio crearListaPrecio(String codigo, String denominacion, Usuario usuario) {
+        ListaPrecio lista = auditar(new ListaPrecio(), usuario);
+        lista.setCodigo(codigo);
+        lista.setDenominacion(denominacion);
+        entityManager.persist(lista);
+        return lista;
+    }
+
+    private void fusionarListaPrecio(ListaPrecio origen, ListaPrecio destino) {
+        List<ListaPrecioArticulo> preciosOrigen = entityManager.createQuery("""
+                SELECT precio
+                FROM ListaPrecioArticulo precio
+                JOIN FETCH precio.articulo
+                WHERE precio.listaPrecio = :origen
+                """, ListaPrecioArticulo.class)
+                .setParameter("origen", origen)
+                .getResultList();
+
+        for (ListaPrecioArticulo precioOrigen : preciosOrigen) {
+            ListaPrecioArticulo precioDestino = entityManager.createQuery("""
+                    SELECT precio
+                    FROM ListaPrecioArticulo precio
+                    WHERE precio.listaPrecio = :destino
+                      AND precio.articulo = :articulo
+                    """, ListaPrecioArticulo.class)
+                    .setParameter("destino", destino)
+                    .setParameter("articulo", precioOrigen.getArticulo())
+                    .setMaxResults(1)
+                    .getResultStream()
+                    .findFirst()
+                    .orElse(null);
+            if (precioDestino == null) {
+                precioOrigen.setListaPrecio(destino);
+            } else {
+                entityManager.createQuery("""
+                        UPDATE FacturaVentaDetalle detalle
+                        SET detalle.listaPrecioArticulo = :destino
+                        WHERE detalle.listaPrecioArticulo = :origen
+                        """)
+                        .setParameter("destino", precioDestino)
+                        .setParameter("origen", precioOrigen)
+                        .executeUpdate();
+                entityManager.remove(precioOrigen);
+            }
+        }
+
+        entityManager.createQuery("""
+                UPDATE FacturaVenta factura
+                SET factura.listaPrecio = :destino
+                WHERE factura.listaPrecio = :origen
+                """)
+                .setParameter("destino", destino)
+                .setParameter("origen", origen)
+                .executeUpdate();
+        entityManager.createQuery("""
+                UPDATE Cliente cliente
+                SET cliente.listaPrecioPredeterminada = :destino
+                WHERE cliente.listaPrecioPredeterminada = :origen
+                """)
+                .setParameter("destino", destino)
+                .setParameter("origen", origen)
+                .executeUpdate();
+        entityManager.flush();
+        entityManager.remove(origen);
+    }
+
+    private Rubro buscarOCrearRubroCatalogo(Usuario usuario) {
+        return entityManager.createQuery(
+                        "SELECT rubro FROM Rubro rubro WHERE rubro.codigo = 9001 ORDER BY rubro.id",
+                        Rubro.class
+                ).setMaxResults(1)
+                .getResultStream()
+                .findFirst()
+                .orElseGet(() -> {
+                    Rubro rubro = auditar(new Rubro(), usuario);
+                    rubro.setCodigo(9001);
+                    rubro.setDenominacion("Tecnología");
+                    entityManager.persist(rubro);
+                    return rubro;
+                });
+    }
+
+    private Marca buscarOCrearMarcaCatalogo(Usuario usuario) {
+        return entityManager.createQuery(
+                        "SELECT marca FROM Marca marca WHERE marca.codigo = 9001 ORDER BY marca.id",
+                        Marca.class
+                ).setMaxResults(1)
+                .getResultStream()
+                .findFirst()
+                .orElseGet(() -> {
+                    Marca marca = auditar(new Marca(), usuario);
+                    marca.setCodigo(9001);
+                    marca.setDenominacion("Genérica");
+                    entityManager.persist(marca);
+                    return marca;
+                });
+    }
+
+    private Articulo buscarOCrearArticulo(
+            ArticuloSemilla datos,
+            Rubro rubro,
+            Marca marca,
+            Usuario usuario
+    ) {
+        return entityManager.createQuery(
+                        "SELECT articulo FROM Articulo articulo WHERE UPPER(articulo.codigo) = :codigo ORDER BY articulo.id",
+                        Articulo.class
+                ).setParameter("codigo", datos.codigo())
+                .setMaxResults(1)
+                .getResultStream()
+                .findFirst()
+                .orElseGet(() -> {
+                    Articulo articulo = auditar(new Articulo(), usuario);
+                    articulo.setCodigo(datos.codigo());
+                    articulo.setDenominacion(datos.denominacion());
+                    articulo.setRubro(rubro);
+                    articulo.setMarca(marca);
+                    entityManager.persist(articulo);
+                    return articulo;
+                });
+    }
+
+    private void crearPrecioSiFalta(
+            ListaPrecio lista,
+            Articulo articulo,
+            double precioVenta,
+            Usuario usuario
+    ) {
+        boolean existe = entityManager.createQuery("""
+                SELECT COUNT(precio)
+                FROM ListaPrecioArticulo precio
+                WHERE precio.listaPrecio = :lista
+                  AND precio.articulo = :articulo
+                """, Long.class)
+                .setParameter("lista", lista)
+                .setParameter("articulo", articulo)
+                .getSingleResult() > 0;
+        if (!existe) {
+            ListaPrecioArticulo precio = auditar(new ListaPrecioArticulo(), usuario);
+            precio.setListaPrecio(lista);
+            precio.setArticulo(articulo);
+            precio.setPrecioVenta(precioVenta);
+            entityManager.persist(precio);
+        }
+    }
+
+    private void actualizarAuditoria(AuditoriaApp entidad, Usuario usuario) {
+        entidad.setFechaModificacion(new Date());
+        entidad.setUsuarioModificacion(usuario);
+    }
+
+    @Transactional(readOnly = true)
+    public PaginaDTO<ArticuloDisponibleDTO> buscarArticulosDisponibles(
+            String busqueda,
+            int pagina,
+            int tamanio,
+            Long listaPrecioId
+    ) {
+        int paginaSegura = Math.max(0, pagina);
+        int tamanioSeguro = Math.max(1, Math.min(tamanio, 100));
+        String patron = patron(busqueda);
+        String filtro = """
+                WHERE (:listaPrecioId IS NULL OR lista.id = :listaPrecioId)
+                AND (:patron = '%%' OR
+                    LOWER(CAST(precio.id AS string)) LIKE :patron OR
+                    LOWER(CAST(articulo.id AS string)) LIKE :patron OR
+                    LOWER(articulo.codigo) LIKE :patron OR
+                    LOWER(articulo.denominacion) LIKE :patron OR
+                    LOWER(CAST(rubro.codigo AS string)) LIKE :patron OR
+                    LOWER(rubro.denominacion) LIKE :patron OR
+                    LOWER(CAST(marca.codigo AS string)) LIKE :patron OR
+                    LOWER(COALESCE(marca.denominacion, '')) LIKE :patron OR
+                    LOWER(CAST(lista.id AS string)) LIKE :patron OR
+                    LOWER(lista.codigo) LIKE :patron OR
+                    LOWER(lista.denominacion) LIKE :patron OR
+                    LOWER(CAST(precio.precioVenta AS string)) LIKE :patron)
+                """;
+
+        List<ArticuloDisponibleDTO> contenido = entityManager.createQuery("""
                 SELECT new com.example.demo.dto.ArticuloDisponibleDTO(
                     precio.id,
                     articulo.id,
                     articulo.codigo,
                     articulo.denominacion,
+                    rubro.codigo,
+                    rubro.denominacion,
+                    marca.codigo,
+                    marca.denominacion,
+                    lista.id,
+                    lista.codigo,
                     lista.denominacion,
                     precio.precioVenta
                 )
                 FROM ListaPrecioArticulo precio
                 JOIN precio.articulo articulo
+                JOIN articulo.rubro rubro
+                LEFT JOIN articulo.marca marca
                 JOIN precio.listaPrecio lista
+                """ + filtro + """
                 ORDER BY articulo.denominacion, lista.denominacion
-                """, ArticuloDisponibleDTO.class).getResultList();
+                """, ArticuloDisponibleDTO.class)
+                .setParameter("patron", patron)
+                .setParameter("listaPrecioId", listaPrecioId)
+                .setFirstResult(paginaSegura * tamanioSeguro)
+                .setMaxResults(tamanioSeguro)
+                .getResultList();
+
+        long total = entityManager.createQuery("""
+                SELECT COUNT(precio.id)
+                FROM ListaPrecioArticulo precio
+                JOIN precio.articulo articulo
+                JOIN articulo.rubro rubro
+                LEFT JOIN articulo.marca marca
+                JOIN precio.listaPrecio lista
+                """ + filtro, Long.class)
+                .setParameter("patron", patron)
+                .setParameter("listaPrecioId", listaPrecioId)
+                .getSingleResult();
+
+        return pagina(contenido, paginaSegura, tamanioSeguro, total);
+    }
+
+    @Transactional(readOnly = true)
+    public PaginaDTO<ClienteDisponibleDTO> buscarClientesDisponibles(
+            String busqueda,
+            int pagina,
+            int tamanio,
+            String orden
+    ) {
+        int paginaSegura = Math.max(0, pagina);
+        int tamanioSeguro = Math.max(1, Math.min(tamanio, 100));
+        String patron = patron(busqueda);
+        String filtro = """
+                WHERE :patron = '%%' OR
+                    LOWER(CAST(cliente.id AS string)) LIKE :patron OR
+                    LOWER(cliente.cuitCuil) LIKE :patron OR
+                    LOWER(cliente.denominacion) LIKE :patron OR
+                    LOWER(CAST(condicion.id AS string)) LIKE :patron OR
+                    LOWER(COALESCE(condicion.denominacion, '')) LIKE :patron OR
+                    LOWER(COALESCE(contacto.email, '')) LIKE :patron OR
+                    LOWER(COALESCE(contacto.telefono, '')) LIKE :patron OR
+                    LOWER(COALESCE(contacto.celular, '')) LIKE :patron OR
+                    LOWER(COALESCE(domicilio.nombreCalle, '')) LIKE :patron OR
+                    LOWER(COALESCE(domicilio.numeroCalle, '')) LIKE :patron OR
+                    LOWER(CAST(listaCliente.id AS string)) LIKE :patron OR
+                    LOWER(COALESCE(listaCliente.codigo, '')) LIKE :patron OR
+                    LOWER(COALESCE(listaCliente.denominacion, '')) LIKE :patron OR
+                    LOWER(CAST(cliente.fechaAlta AS string)) LIKE :patron
+                """;
+
+        List<ClienteDisponibleDTO> contenido = entityManager.createQuery("""
+                SELECT new com.example.demo.dto.ClienteDisponibleDTO(
+                    cliente.id,
+                    cliente.cuitCuil,
+                    cliente.denominacion,
+                    condicion.id,
+                    condicion.denominacion,
+                    contacto.email,
+                    contacto.telefono,
+                    contacto.celular,
+                    domicilio.nombreCalle,
+                    domicilio.numeroCalle,
+                    listaCliente.id,
+                    listaCliente.codigo,
+                    listaCliente.denominacion,
+                    cliente.fechaAlta,
+                    MAX(factura.fechaEmision)
+                )
+                FROM Cliente cliente
+                LEFT JOIN cliente.condicionIva condicion
+                JOIN cliente.contacto contacto
+                JOIN cliente.domicilio domicilio
+                LEFT JOIN cliente.listaPrecioPredeterminada listaCliente
+                LEFT JOIN FacturaVenta factura ON factura.cliente = cliente
+                """ + filtro + """
+                GROUP BY cliente.id, cliente.cuitCuil, cliente.denominacion,
+                    condicion.id, condicion.denominacion,
+                    contacto.email, contacto.telefono, contacto.celular,
+                    domicilio.nombreCalle, domicilio.numeroCalle,
+                    listaCliente.id, listaCliente.codigo, listaCliente.denominacion,
+                    cliente.fechaAlta
+                """ + ordenClientes(orden), ClienteDisponibleDTO.class)
+                .setParameter("patron", patron)
+                .setFirstResult(paginaSegura * tamanioSeguro)
+                .setMaxResults(tamanioSeguro)
+                .getResultList();
+
+        long total = entityManager.createQuery("""
+                SELECT COUNT(cliente.id)
+                FROM Cliente cliente
+                LEFT JOIN cliente.condicionIva condicion
+                JOIN cliente.contacto contacto
+                JOIN cliente.domicilio domicilio
+                LEFT JOIN cliente.listaPrecioPredeterminada listaCliente
+                """ + filtro, Long.class)
+                .setParameter("patron", patron)
+                .getSingleResult();
+
+        return pagina(contenido, paginaSegura, tamanioSeguro, total);
+    }
+
+    private String ordenClientes(String orden) {
+        if ("COMPRADOR_RECIENTE".equalsIgnoreCase(orden)) {
+            return " ORDER BY MAX(factura.fechaEmision) DESC, cliente.denominacion";
+        }
+        return " ORDER BY cliente.fechaAlta DESC, cliente.id DESC";
+    }
+
+    private String patron(String busqueda) {
+        return "%" + (busqueda == null ? "" : busqueda.trim().toLowerCase()) + "%";
+    }
+
+    private <T> PaginaDTO<T> pagina(List<T> contenido, int pagina, int tamanio, long total) {
+        int totalPaginas = total == 0 ? 0 : (int) Math.ceil((double) total / tamanio);
+        return new PaginaDTO<>(contenido, pagina, tamanio, total, totalPaginas);
     }
 
     @Transactional(readOnly = true)
@@ -136,7 +540,13 @@ public class DatosMaestrosService {
                 .map(c -> new FacturaOpcionesDTO.ClienteOpcionDTO(
                         c.getId(),
                         c.getDenominacion(),
-                        c.getCondicionIva() == null ? null : c.getCondicionIva().getId()
+                        c.getCondicionIva() == null ? null : c.getCondicionIva().getId(),
+                        c.getListaPrecioPredeterminada() == null
+                                ? null
+                                : c.getListaPrecioPredeterminada().getId(),
+                        c.getListaPrecioPredeterminada() == null
+                                ? null
+                                : c.getListaPrecioPredeterminada().getDenominacion()
                 ))
                 .toList();
 
@@ -154,6 +564,16 @@ public class DatosMaestrosService {
                 .map(t -> opcion(t.getId(), t.getDenominacion() + " (" + t.getSimbolo() + ")"))
                 .toList();
 
+        List<FacturaOpcionesDTO.OpcionDTO> listasPrecio = entityManager.createQuery(
+                        "SELECT lista FROM ListaPrecio lista ORDER BY lista.denominacion",
+                        ListaPrecio.class
+                ).getResultList().stream()
+                .map(lista -> opcion(
+                        lista.getId(),
+                        lista.getDenominacion() + " (" + lista.getCodigo() + ")"
+                ))
+                .toList();
+
         FacturaOpcionesDTO.OpcionDTO usuario = entityManager.createQuery(
                         "SELECT u FROM Usuario u WHERE LOWER(u.usuario) = 'admin' ORDER BY u.id",
                         Usuario.class
@@ -163,14 +583,69 @@ public class DatosMaestrosService {
                 .map(u -> opcion(u.getId(), u.getNombre() + " " + u.getApellido() + " (admin)"))
                 .orElse(null);
 
+        ListaPrecio listaMinorista = buscarListaPrecioMinorista();
+        FacturaOpcionesDTO.OpcionDTO listaPrecioConsumidorFinal = listaMinorista == null
+                ? null
+                : opcion(listaMinorista.getId(), listaMinorista.getDenominacion());
+
         return new FacturaOpcionesDTO(
                 siguienteNumero,
                 puntosVenta,
                 clientes,
                 condicionesIva,
                 tiposMoneda,
+                listasPrecio,
+                listaPrecioConsumidorFinal,
                 usuario
         );
+    }
+
+    @Transactional(readOnly = true)
+    public ArticuloAltaDTO.Opciones buscarOpcionesAltaArticulo() {
+        List<ArticuloAltaDTO.Opcion> rubros = entityManager.createQuery(
+                        "SELECT rubro FROM Rubro rubro ORDER BY rubro.denominacion",
+                        Rubro.class
+                ).getResultList().stream()
+                .map(rubro -> new ArticuloAltaDTO.Opcion(
+                        rubro.getId(),
+                        rubro.getCodigo() + " - " + rubro.getDenominacion()
+                ))
+                .toList();
+        List<ArticuloAltaDTO.Opcion> marcas = entityManager.createQuery(
+                        "SELECT marca FROM Marca marca ORDER BY marca.denominacion",
+                        Marca.class
+                ).getResultList().stream()
+                .map(marca -> new ArticuloAltaDTO.Opcion(
+                        marca.getId(),
+                        marca.getCodigo() + " - " + marca.getDenominacion()
+                ))
+                .toList();
+        List<ArticuloAltaDTO.ListaPrecioOpcion> listasPrecio = entityManager.createQuery("""
+                        SELECT lista
+                        FROM ListaPrecio lista
+                        ORDER BY CASE WHEN UPPER(lista.codigo) = 'MINORISTA' THEN 0 ELSE 1 END,
+                            lista.denominacion
+                        """, ListaPrecio.class)
+                .getResultList().stream()
+                .map(lista -> new ArticuloAltaDTO.ListaPrecioOpcion(
+                        lista.getId(),
+                        lista.getCodigo(),
+                        lista.getDenominacion()
+                ))
+                .toList();
+        ArticuloAltaDTO.Opcion usuario = entityManager.createQuery(
+                        "SELECT usuario FROM Usuario usuario " +
+                                "WHERE LOWER(usuario.usuario) = 'admin' ORDER BY usuario.id",
+                        Usuario.class
+                ).setMaxResults(1)
+                .getResultStream()
+                .findFirst()
+                .map(item -> new ArticuloAltaDTO.Opcion(
+                        item.getId(),
+                        item.getNombre() + " " + item.getApellido() + " (admin)"
+                ))
+                .orElse(null);
+        return new ArticuloAltaDTO.Opciones(rubros, marcas, listasPrecio, usuario);
     }
 
     private FacturaOpcionesDTO.OpcionDTO opcion(Long id, String descripcion) {
@@ -251,9 +726,28 @@ public class DatosMaestrosService {
         entidad.setCuitCuil(request.cuitCuil().trim());
         entidad.setDenominacion(request.denominacion().trim());
         entidad.setCondicionIva(condicionIva);
+        entidad.setListaPrecioPredeterminada(
+                request.listaPrecioId() == null
+                        ? buscarListaPrecioMinorista()
+                        : buscar(ListaPrecio.class, request.listaPrecioId(), "listaPrecioId")
+        );
         entidad.setContacto(contacto);
         entidad.setDomicilio(domicilio);
         return persistir(entidad, entidad.getDenominacion());
+    }
+
+    @Transactional
+    public EntidadCreadaDTO actualizarListaPrecioCliente(
+            Long clienteId,
+            DatosMaestrosDTO.ClienteListaPrecioRequest request
+    ) {
+        Cliente cliente = buscar(Cliente.class, clienteId, "clienteId");
+        ListaPrecio lista = buscar(ListaPrecio.class, request.listaPrecioId(), "listaPrecioId");
+        Usuario usuario = usuario(request.usuarioId());
+        cliente.setListaPrecioPredeterminada(lista);
+        cliente.setFechaModificacion(new Date());
+        cliente.setUsuarioModificacion(usuario);
+        return new EntidadCreadaDTO(cliente.getId(), cliente.getDenominacion());
     }
 
     @Transactional
@@ -281,8 +775,16 @@ public class DatosMaestrosService {
         Usuario usuario = usuario(request.usuarioId());
         requerido(request.codigo(), "codigo");
         requerido(request.denominacion(), "denominacion");
+        Long listasConCodigo = entityManager.createQuery(
+                        "SELECT COUNT(lista) FROM ListaPrecio lista WHERE UPPER(lista.codigo) = :codigo",
+                        Long.class
+                ).setParameter("codigo", request.codigo().trim().toUpperCase())
+                .getSingleResult();
+        if (listasConCodigo > 0) {
+            throw new IllegalArgumentException("Ya existe una lista de precios con ese codigo");
+        }
         ListaPrecio entidad = auditar(new ListaPrecio(), usuario);
-        entidad.setCodigo(request.codigo().trim());
+        entidad.setCodigo(request.codigo().trim().toUpperCase());
         entidad.setDenominacion(request.denominacion().trim());
         return persistir(entidad, entidad.getDenominacion());
     }
@@ -305,12 +807,88 @@ public class DatosMaestrosService {
     }
 
     @Transactional
+    public EntidadCreadaDTO crearArticuloConPrecios(ArticuloAltaDTO.CrearRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("El cuerpo de la solicitud es obligatorio");
+        }
+        requerido(request.codigo(), "codigo");
+        requerido(request.denominacion(), "denominacion");
+        if (request.precios() == null || request.precios().isEmpty()) {
+            throw new IllegalArgumentException("Debe seleccionar al menos una lista de precios");
+        }
+
+        Usuario usuario = usuario(request.usuarioId());
+        Rubro rubro = buscar(Rubro.class, request.rubroId(), "rubroId");
+        Marca marca = request.marcaId() == null
+                ? null
+                : buscar(Marca.class, request.marcaId(), "marcaId");
+        String codigo = request.codigo().trim().toUpperCase();
+        boolean codigoExistente = entityManager.createQuery(
+                        "SELECT COUNT(articulo) FROM Articulo articulo WHERE UPPER(articulo.codigo) = :codigo",
+                        Long.class
+                ).setParameter("codigo", codigo)
+                .getSingleResult() > 0;
+        if (codigoExistente) {
+            throw new IllegalArgumentException("Ya existe un articulo con ese codigo");
+        }
+
+        Set<Long> listasUsadas = new HashSet<>();
+        for (ArticuloAltaDTO.PrecioRequest precio : request.precios()) {
+            if (precio == null || precio.listaPrecioId() == null) {
+                throw new IllegalArgumentException("Cada precio debe indicar listaPrecioId");
+            }
+            if (!listasUsadas.add(precio.listaPrecioId())) {
+                throw new IllegalArgumentException("No se puede repetir una lista de precios");
+            }
+            if (precio.precioVenta() < 0) {
+                throw new IllegalArgumentException("precioVenta no puede ser negativo");
+            }
+        }
+
+        Articulo articulo = auditar(new Articulo(), usuario);
+        articulo.setCodigo(codigo);
+        articulo.setDenominacion(request.denominacion().trim());
+        articulo.setRubro(rubro);
+        articulo.setMarca(marca);
+        entityManager.persist(articulo);
+
+        for (ArticuloAltaDTO.PrecioRequest solicitudPrecio : request.precios()) {
+            ListaPrecio lista = buscar(
+                    ListaPrecio.class,
+                    solicitudPrecio.listaPrecioId(),
+                    "listaPrecioId"
+            );
+            ListaPrecioArticulo precio = auditar(new ListaPrecioArticulo(), usuario);
+            precio.setArticulo(articulo);
+            precio.setListaPrecio(lista);
+            precio.setPrecioVenta(solicitudPrecio.precioVenta());
+            entityManager.persist(precio);
+        }
+        entityManager.flush();
+        return new EntidadCreadaDTO(articulo.getId(), articulo.getDenominacion());
+    }
+
+    @Transactional
     public EntidadCreadaDTO crearPrecio(DatosMaestrosDTO.ListaPrecioArticuloRequest request) {
         Usuario usuario = usuario(request.usuarioId());
         ListaPrecio lista = buscar(ListaPrecio.class, request.listaPrecioId(), "listaPrecioId");
         Articulo articulo = buscar(Articulo.class, request.articuloId(), "articuloId");
         if (request.precioVenta() < 0) {
             throw new IllegalArgumentException("precioVenta no puede ser negativo");
+        }
+        Long preciosExistentes = entityManager.createQuery("""
+                SELECT COUNT(precio)
+                FROM ListaPrecioArticulo precio
+                WHERE precio.listaPrecio.id = :listaPrecioId
+                  AND precio.articulo.id = :articuloId
+                """, Long.class)
+                .setParameter("listaPrecioId", lista.getId())
+                .setParameter("articuloId", articulo.getId())
+                .getSingleResult();
+        if (preciosExistentes > 0) {
+            throw new IllegalArgumentException(
+                    "El articulo ya tiene un precio definido para esa lista"
+            );
         }
         ListaPrecioArticulo entidad = auditar(new ListaPrecioArticulo(), usuario);
         entidad.setListaPrecio(lista);
@@ -354,5 +932,13 @@ public class DatosMaestrosService {
         if (valor == null || valor.isBlank()) {
             throw new IllegalArgumentException(campo + " es obligatorio");
         }
+    }
+
+    private record ArticuloSemilla(
+            String codigo,
+            String denominacion,
+            double precioMinorista,
+            double precioMayorista
+    ) {
     }
 }

@@ -348,6 +348,26 @@ td input {
   gap: .4rem;
 }
 
+[data-action="anular"] {
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  background: transparent;
+}
+
+[data-action="anular"]:hover {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+[data-action="editar"] {
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  background: transparent;
+}
+
+[data-action="editar"]:hover {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
 [data-action="eliminar"],
 #confirmar-accion[data-danger="true"] {
   color: var(--danger-foreground);
@@ -355,7 +375,7 @@ td input {
 }
 
 .facturas-table {
-  min-width: 82rem;
+  min-width: 96rem;
   table-layout: fixed;
 }
 
@@ -364,7 +384,7 @@ td input {
 }
 
 .facturas-table th:nth-child(2) {
-  width: 7%;
+  width: 6%;
 }
 
 .facturas-table th:nth-child(3) {
@@ -372,19 +392,19 @@ td input {
 }
 
 .facturas-table th:nth-child(4) {
-  width: 12%;
-}
-
-.facturas-table th:nth-child(5) {
-  width: 14%;
-}
-
-.facturas-table th:nth-child(6) {
   width: 11%;
 }
 
+.facturas-table th:nth-child(5) {
+  width: 13%;
+}
+
+.facturas-table th:nth-child(6) {
+  width: 10%;
+}
+
 .facturas-table th:nth-child(7) {
-  width: 9%;
+  width: 8%;
 }
 
 .facturas-table th:nth-child(8) {
@@ -396,7 +416,7 @@ td input {
 }
 
 .facturas-table th:nth-child(10) {
-  width: 21%;
+  width: 26%;
 }
 
 .facturas-table th:nth-child(7),

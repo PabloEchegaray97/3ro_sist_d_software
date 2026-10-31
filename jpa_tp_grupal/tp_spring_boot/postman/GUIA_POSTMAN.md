@@ -11,8 +11,8 @@ La variable `baseUrl` ya contiene `http://localhost:8080`.
 
 ## Orden de ejecución
 
-1. Ejecutar del 01 al 10 en `00 - Preparar datos maestros`.
-2. Ejecutar 11 y 12 en `01 - Crear facturas`.
+1. Ejecutar del 01 al 13 en `00 - Preparar datos maestros`.
+2. Ejecutar las dos solicitudes de `01 - Crear facturas`.
 3. Probar consultas, errores y reportes.
 4. Ejecutar al final del 28 al 31 en `05 - Actualizar, anular y eliminar`.
 
@@ -20,9 +20,22 @@ Las altas de datos maestros guardan automáticamente los IDs en las variables de
 la colección. Por ejemplo, crear el artículo guarda `articuloId`, y crear su
 precio guarda `listaPrecioArticuloId`.
 
+## Precios minoristas y mayoristas
+
+La colección crea dos listas independientes: `MINORISTA` y `MAYORISTA`. El
+mismo artículo tiene una fila de precio en cada lista; no se calcula el precio
+mayorista como un descuento circunstancial sobre el minorista.
+
+El cliente de ejemplo queda asociado de forma predeterminada a `MAYORISTA` y
+Consumidor Final usa `MINORISTA`. La factura conserva `listaPrecioId`, mientras
+que cada detalle conserva `listaPrecioArticuloId` y el precio unitario aplicado
+como valor histórico. Una bonificación sigue siendo un concepto separado.
+
 ## POST: creación en cascada
 
 Los requests 11 y 12 envían `FacturaRequestDTO`. Cada detalle incluye:
+
+- `listaPrecioId` en la cabecera: lista elegida para toda la factura.
 
 - `articuloId`: artículo que se factura.
 - `listaPrecioArticuloId`: precio asociado al mismo artículo.

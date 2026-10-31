@@ -46,6 +46,9 @@ export interface FacturaVistaDTO {
   puntoVentaDescripcion: string;
   clienteId: number | null;
   clienteDenominacion: string;
+  listaPrecioId: number | null;
+  listaPrecioCodigo: string | null;
+  listaPrecio: string | null;
   condicionIvaId: number;
   condicionIva: string;
   tipoMonedaId: number;
@@ -66,8 +69,40 @@ export interface ArticuloDisponibleDTO {
   articuloId: number;
   codigo: string;
   denominacion: string;
+  rubroCodigo: number;
+  rubro: string;
+  marcaCodigo: number | null;
+  marca: string | null;
+  listaPrecioId: number;
+  listaPrecioCodigo: string;
   listaPrecio: string;
   precioVenta: number;
+}
+
+export interface ClienteDisponibleDTO {
+  id: number;
+  cuitCuil: string;
+  denominacion: string;
+  condicionIvaId: number | null;
+  condicionIva: string | null;
+  email: string | null;
+  telefono: string | null;
+  celular: string | null;
+  nombreCalle: string | null;
+  numeroCalle: string | null;
+  listaPrecioId: number | null;
+  listaPrecioCodigo: string | null;
+  listaPrecio: string | null;
+  fechaAlta: string;
+  ultimaCompra: string | null;
+}
+
+export interface PaginaDTO<T> {
+  contenido: T[];
+  pagina: number;
+  tamanio: number;
+  totalElementos: number;
+  totalPaginas: number;
 }
 
 export interface OpcionDTO {
@@ -77,6 +112,8 @@ export interface OpcionDTO {
 
 export interface ClienteOpcionDTO extends OpcionDTO {
   condicionIvaId: number | null;
+  listaPrecioId: number | null;
+  listaPrecio: string | null;
 }
 
 export interface FacturaOpcionesDTO {
@@ -85,6 +122,8 @@ export interface FacturaOpcionesDTO {
   clientes: ClienteOpcionDTO[];
   condicionesIva: OpcionDTO[];
   tiposMoneda: OpcionDTO[];
+  listasPrecio: OpcionDTO[];
+  listaPrecioConsumidorFinal: OpcionDTO | null;
   usuario: OpcionDTO | null;
 }
 
@@ -93,6 +132,7 @@ export interface FacturaRequestDTO {
   fechaEmision: string;
   puntoVentaId: number;
   clienteId: number | null;
+  listaPrecioId: number;
   condicionIvaId: number;
   tipoMonedaId: number;
   usuarioId: number;
@@ -107,4 +147,73 @@ export interface FacturaFiltrosDTO {
   fechaHasta?: string;
   estado?: string;
   montoMinimo?: number;
+}
+
+// Espejo de DatosMaestrosDTO.java para mantener iguales los contratos de escritura.
+export interface ClienteRequestDTO {
+  cuitCuil: string;
+  denominacion: string;
+  email: string | null;
+  telefono: string | null;
+  celular: string | null;
+  nombreCalle: string | null;
+  numeroCalle: string | null;
+  condicionIvaId: number;
+  listaPrecioId: number | null;
+  usuarioId: number;
+}
+
+export interface ClienteListaPrecioRequestDTO {
+  listaPrecioId: number;
+  usuarioId: number;
+}
+
+export interface ListaPrecioRequestDTO {
+  codigo: string;
+  denominacion: string;
+  usuarioId: number;
+}
+
+export interface ListaPrecioArticuloRequestDTO {
+  listaPrecioId: number;
+  articuloId: number;
+  precioVenta: number;
+  usuarioId: number;
+}
+
+export interface ArticuloAltaOpcionDTO {
+  id: number;
+  descripcion: string;
+}
+
+export interface ArticuloAltaListaPrecioOpcionDTO {
+  id: number;
+  codigo: string;
+  denominacion: string;
+}
+
+export interface ArticuloAltaOpcionesDTO {
+  rubros: ArticuloAltaOpcionDTO[];
+  marcas: ArticuloAltaOpcionDTO[];
+  listasPrecio: ArticuloAltaListaPrecioOpcionDTO[];
+  usuario: ArticuloAltaOpcionDTO | null;
+}
+
+export interface ArticuloAltaPrecioRequestDTO {
+  listaPrecioId: number;
+  precioVenta: number;
+}
+
+export interface ArticuloAltaRequestDTO {
+  codigo: string;
+  denominacion: string;
+  rubroId: number;
+  marcaId: number | null;
+  usuarioId: number;
+  precios: ArticuloAltaPrecioRequestDTO[];
+}
+
+export interface EntidadCreadaDTO {
+  id: number;
+  descripcion: string;
 }

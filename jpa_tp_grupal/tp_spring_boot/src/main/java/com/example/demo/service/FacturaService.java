@@ -12,6 +12,7 @@ import com.example.demo.model.CondicionIva;
 import com.example.demo.model.FacturaVenta;
 import com.example.demo.model.FacturaVentaDetalle;
 import com.example.demo.model.ListaPrecioArticulo;
+import com.example.demo.model.ListaPrecio;
 import com.example.demo.model.PuntoVenta;
 import com.example.demo.model.TipoMoneda;
 import com.example.demo.model.Usuario;
@@ -58,6 +59,10 @@ public class FacturaService {
         FacturaVenta factura = facturaEscrituraRepository.buscarFactura(id);
         Cliente cliente = factura.getCliente();
         Usuario usuario = factura.getUsuarioCarga();
+        ListaPrecio listaPrecio = factura.getListaPrecio();
+        if (listaPrecio == null && !factura.getDetalles().isEmpty()) {
+            listaPrecio = factura.getDetalles().get(0).getListaPrecioArticulo().getListaPrecio();
+        }
 
         List<FacturaDetalleVistaDTO> detalles = factura.getDetalles().stream()
                 .map(detalle -> {
@@ -97,6 +102,9 @@ public class FacturaService {
                 factura.getPuntoVenta().getDescripcion(),
                 cliente == null ? null : cliente.getId(),
                 cliente == null ? "Consumidor Final" : cliente.getDenominacion(),
+                listaPrecio == null ? null : listaPrecio.getId(),
+                listaPrecio == null ? null : listaPrecio.getCodigo(),
+                listaPrecio == null ? null : listaPrecio.getDenominacion(),
                 factura.getCondicionIva().getId(),
                 factura.getCondicionIva().getDenominacion(),
                 factura.getTipoMoneda().getId(),
@@ -162,6 +170,7 @@ public class FacturaService {
         boolean actualizacionCompleta = solicitud.getNumero() != null
                 || solicitud.getFechaEmision() != null
                 || solicitud.getPuntoVentaId() != null
+                || solicitud.getListaPrecioId() != null
                 || solicitud.getCondicionIvaId() != null
                 || solicitud.getTipoMonedaId() != null
                 || solicitud.getDetalles() != null;
@@ -243,6 +252,14 @@ public class FacturaService {
                 factura.setCondicionIva(cliente.getCondicionIva());
             }
         }
+        if (solicitud.getListaPrecioId() != null) {
+            factura.setListaPrecio(facturaEscrituraRepository.buscarRequerido(
+                    ListaPrecio.class, solicitud.getListaPrecioId(), "listaPrecioId"
+            ));
+        } else if (creacion && factura.getCliente() != null
+                && factura.getCliente().getListaPrecioPredeterminada() != null) {
+            factura.setListaPrecio(factura.getCliente().getListaPrecioPredeterminada());
+        }
         if (solicitud.getEstado() != null) {
             if (solicitud.getEstado().isBlank()) {
                 throw new IllegalArgumentException("estado no puede estar vacio");
@@ -276,6 +293,12 @@ public class FacturaService {
             if (!precio.getArticulo().getId().equals(articulo.getId())) {
                 throw new IllegalArgumentException(
                         "listaPrecioArticuloId no corresponde al articuloId indicado"
+                );
+            }
+            if (factura.getListaPrecio() != null
+                    && !precio.getListaPrecio().getId().equals(factura.getListaPrecio().getId())) {
+                throw new IllegalArgumentException(
+                        "listaPrecioArticuloId no pertenece a la lista de precios de la factura"
                 );
             }
 
@@ -329,9 +352,10 @@ public class FacturaService {
         }
         if (solicitud.getNumero() == null || solicitud.getFechaEmision() == null
                 || solicitud.getPuntoVentaId() == null || solicitud.getCondicionIvaId() == null
+                || solicitud.getListaPrecioId() == null
                 || solicitud.getTipoMonedaId() == null || solicitud.getUsuarioId() == null) {
             throw new IllegalArgumentException(
-                    "numero, fechaEmision, puntoVentaId, condicionIvaId, " +
+                    "numero, fechaEmision, puntoVentaId, listaPrecioId, condicionIvaId, " +
                     "tipoMonedaId y usuarioId son obligatorios"
             );
         }

@@ -50,6 +50,11 @@ public class FacturaVenta extends AuditoriaApp {
     @EqualsAndHashCode.Exclude
     private Cliente cliente;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lista_precio_id")
+    @EqualsAndHashCode.Exclude
+    private ListaPrecio listaPrecio;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "condicion_iva_id", nullable = false)
     @EqualsAndHashCode.Exclude

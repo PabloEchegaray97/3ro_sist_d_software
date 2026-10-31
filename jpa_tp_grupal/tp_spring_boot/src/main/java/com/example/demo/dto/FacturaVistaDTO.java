@@ -23,6 +23,9 @@ public class FacturaVistaDTO {
     private String puntoVentaDescripcion;
     private Long clienteId;
     private String clienteDenominacion;
+    private Long listaPrecioId;
+    private String listaPrecioCodigo;
+    private String listaPrecio;
     private Long condicionIvaId;
     private String condicionIva;
     private Long tipoMonedaId;
