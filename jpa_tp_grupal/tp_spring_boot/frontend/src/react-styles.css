@@ -508,8 +508,11 @@ dialog::backdrop { background: var(--overlay); }
   margin: auto;
 }
 .invoice-form-dialog[open] { display: flex; flex-direction: column; overflow: hidden; }
-.invoice-form-dialog > form { min-height: 0; flex: 1; display: flex; flex-direction: column; }
-.invoice-form-dialog .details-list { min-height: 10rem; flex: 1; }
+.invoice-form-dialog > form { min-height: 0; flex: 1; display: flex; flex-direction: column; gap: .65rem; overflow: hidden; }
+.invoice-form-dialog .form-lock { min-height: 0; flex: 1; display: flex; flex-direction: column; gap: .65rem; overflow: hidden; }
+.invoice-form-dialog .details-list { min-height: 10rem; flex: 1 1 auto; }
+.invoice-form-dialog .calculated-total { min-height: 2rem; flex: 0 0 auto; align-items: center; }
+.invoice-form-dialog form > footer { min-height: var(--button-height); flex: 0 0 auto; align-items: center; }
 .invoice-header-editor { display: grid; gap: 1rem; }
 .invoice-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .invoice-section-heading > strong { font-weight: 500; }
@@ -529,6 +532,7 @@ dialog::backdrop { background: var(--overlay); }
   margin: -1rem -1rem .65rem;
   min-height: var(--modal-header-min-height);
   padding: var(--modal-header-padding-y) 1rem;
+  border-bottom: 1px solid var(--border);
   border-radius: var(--radius-modal) var(--radius-modal) 0 0;
   display: flex;
   align-items: center;
@@ -582,6 +586,7 @@ input[readonly], select:disabled { color: var(--text-secondary); background: var
 .details-list > .table-shell { min-height: 0; flex: 1; border-radius: 0; }
 .details-list.has-details { overflow-y: auto; }
 .details-list.has-details > .table-shell { flex: 0 0 auto; overflow: visible; }
+.details-list.has-details .details-editor thead th { position: sticky; z-index: 2; top: 0; }
 .details-add-action { min-height: 3.75rem; padding: .65rem; flex: 1; display: flex; align-items: center; justify-content: center; background: var(--surface-card); }
 .details-editor.empty { height: 100%; }
 .details-editor.empty tbody,
