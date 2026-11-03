@@ -1,5 +1,10 @@
 package com.example.demo.dto;
 
+import java.math.BigDecimal;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 public final class DatosMaestrosDTO {
 
     private DatosMaestrosDTO() {
@@ -29,26 +34,32 @@ public final class DatosMaestrosDTO {
     }
 
     public record ClienteRequest(
-            String cuitCuil,
-            String denominacion,
+            @NotBlank String cuitCuil,
+            @NotBlank String denominacion,
             String email,
             String telefono,
             String celular,
             String nombreCalle,
             String numeroCalle,
-            Long condicionIvaId,
+            @NotNull Long condicionIvaId,
             Long listaPrecioId,
-            Long usuarioId
+            @NotNull Long usuarioId
     ) {
     }
 
     public record ClienteListaPrecioRequest(Long listaPrecioId, Long usuarioId) {
     }
 
-    public record RubroRequest(Integer codigo, String denominacion, Long usuarioId) {
+    public record RubroRequest(
+            @NotBlank String denominacion,
+            @NotNull Long usuarioId
+    ) {
     }
 
-    public record MarcaRequest(Integer codigo, String denominacion, Long usuarioId) {
+    public record MarcaRequest(
+            @NotBlank String denominacion,
+            @NotNull Long usuarioId
+    ) {
     }
 
     public record ListaPrecioRequest(String codigo, String denominacion, Long usuarioId) {
@@ -64,10 +75,10 @@ public final class DatosMaestrosDTO {
     }
 
     public record ListaPrecioArticuloRequest(
-            Long listaPrecioId,
-            Long articuloId,
-            double precioVenta,
-            Long usuarioId
+            @NotNull Long listaPrecioId,
+            @NotNull Long articuloId,
+            @NotNull @DecimalMin("0.00") BigDecimal precioVenta,
+            @NotNull Long usuarioId
     ) {
     }
 }

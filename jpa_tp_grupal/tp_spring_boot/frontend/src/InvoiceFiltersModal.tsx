@@ -12,7 +12,6 @@ interface InvoiceFiltersModalProps {
 interface FilterDraft {
   fechaDesde: string;
   fechaHasta: string;
-  estado: string;
   montoMinimo: string;
 }
 
@@ -20,7 +19,6 @@ export function InvoiceFiltersModal({ open, filters, onApply, onClose }: Invoice
   const [draft, setDraft] = useState<FilterDraft>({
     fechaDesde: "",
     fechaHasta: "",
-    estado: "",
     montoMinimo: "",
   });
 
@@ -29,7 +27,6 @@ export function InvoiceFiltersModal({ open, filters, onApply, onClose }: Invoice
     setDraft({
       fechaDesde: filters.fechaDesde ?? "",
       fechaHasta: filters.fechaHasta ?? "",
-      estado: filters.estado ?? "",
       montoMinimo: filters.montoMinimo == null ? "" : String(filters.montoMinimo),
     });
   }, [filters, open]);
@@ -39,13 +36,12 @@ export function InvoiceFiltersModal({ open, filters, onApply, onClose }: Invoice
     onApply({
       fechaDesde: draft.fechaDesde || undefined,
       fechaHasta: draft.fechaHasta || undefined,
-      estado: draft.estado || undefined,
       montoMinimo: draft.montoMinimo === "" ? undefined : Number(draft.montoMinimo),
     });
   };
 
   const clear = () => {
-    setDraft({ fechaDesde: "", fechaHasta: "", estado: "", montoMinimo: "" });
+    setDraft({ fechaDesde: "", fechaHasta: "", montoMinimo: "" });
     onApply({});
   };
 
@@ -55,7 +51,6 @@ export function InvoiceFiltersModal({ open, filters, onApply, onClose }: Invoice
         <fieldset className="filter-grid">
           <label><span>Desde</span><input type="date" value={draft.fechaDesde} onChange={(event) => setDraft({ ...draft, fechaDesde: event.target.value })} /></label>
           <label><span>Hasta</span><input type="date" value={draft.fechaHasta} onChange={(event) => setDraft({ ...draft, fechaHasta: event.target.value })} /></label>
-          <label><span>Estado</span><select value={draft.estado} onChange={(event) => setDraft({ ...draft, estado: event.target.value })}><option value="">Todos</option><option value="EMITIDA">Emitida</option><option value="ANULADA">Anulada</option></select></label>
           <label><span>Monto mínimo</span><input type="number" min="0" step="0.01" value={draft.montoMinimo} onChange={(event) => setDraft({ ...draft, montoMinimo: event.target.value })} /></label>
         </fieldset>
         <footer>

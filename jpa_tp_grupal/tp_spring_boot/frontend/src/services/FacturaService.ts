@@ -1,8 +1,10 @@
 import type {
   ArticuloAltaOpcionesDTO,
   ArticuloAltaRequestDTO,
+  ArticuloEdicionDTO,
   ArticuloAltaOpcionDTO,
   ArticuloAltaListaPrecioOpcionDTO,
+  ClienteRequestDTO,
   ArticuloDisponibleDTO,
   ClienteDisponibleDTO,
   PaginaDTO,
@@ -13,10 +15,18 @@ import type {
   FacturaRequestDTO,
   FacturaVistaDTO,
   EntidadCreadaDTO,
+  ArcaEmisionDTO,
+  ArcaConfiguracionDTO,
+  CatalogoItemDTO,
+  RubroRequestDTO,
+  MarcaRequestDTO,
+  SistemaInfoDTO,
 } from "../models/factura.dto";
 
 interface ApiError {
   mensaje?: string;
+  detail?: string;
+  fieldErrors?: Record<string, string>;
 }
 
 type JsonObject = Record<string, unknown>;
@@ -52,7 +62,12 @@ function facturaReporteDTO(value: unknown): FacturaReporteDTO {
     );
   }
 
-  if (facturaReporteFields.some((field) => typeof dto[field] !== facturaReporteShape[field])) {
+  if (facturaReporteFields.some((field) => {
+    if (field === "numeroFactura" || field === "fechaEmision") {
+      return dto[field] !== null && typeof dto[field] !== facturaReporteShape[field];
+    }
+    return typeof dto[field] !== facturaReporteShape[field];
+  })) {
     throw new Error("Los tipos de FacturaReporteDTO no coinciden entre Java y TypeScript");
   }
 
@@ -74,12 +89,14 @@ const facturaDetalleVistaFields = [
 ] as const satisfies readonly (keyof FacturaDetalleVistaDTO)[];
 
 const facturaVistaFields = [
-  "id", "numero", "fechaEmision", "puntoVentaId", "puntoVentaDescripcion",
-  "clienteId", "clienteDenominacion", "listaPrecioId", "listaPrecioCodigo", "listaPrecio",
+  "id", "numero", "fechaEmision", "puntoVentaId", "puntoVentaNumero", "puntoVentaDescripcion",
+  "puntoVentaDomicilio", "tipoComprobante", "clienteId", "clienteDenominacion",
+  "clienteCuitCuil", "clienteTelefono", "clienteEmail", "clienteDomicilio",
+  "listaPrecioId", "listaPrecioCodigo", "listaPrecio",
   "condicionIvaId", "condicionIva",
-  "tipoMonedaId", "tipoMoneda", "usuarioId", "usuario", "estado",
+  "tipoMonedaId", "tipoMonedaCodigo", "tipoMoneda", "usuarioId", "usuario", "estado",
   "importeCobrado", "importeSaldo", "importeTotal", "observaciones",
-  "fechaAnulacion", "detalles",
+  "fechaAnulacion", "cae", "caeFechaVencimiento", "resultadoAfip", "motivoRechazo", "detalles",
 ] as const satisfies readonly (keyof FacturaVistaDTO)[];
 
 const articuloAltaOpcionesFields = [
@@ -169,14 +186,14 @@ export class FacturaService {
     busqueda: string,
     pagina: number,
     tamanio: number,
-    listaPrecioId: number,
+    listaPrecioId: number | null,
   ): Promise<PaginaDTO<ArticuloDisponibleDTO>> {
     const parametros = new URLSearchParams({
       busqueda,
       pagina: String(pagina),
       tamanio: String(tamanio),
-      listaPrecioId: String(listaPrecioId),
     });
+    if (listaPrecioId != null) parametros.set("listaPrecioId", String(listaPrecioId));
     return this.solicitar<PaginaDTO<ArticuloDisponibleDTO>>(
       `${this.datosMaestrosUrl}/precios-articulo?${parametros.toString()}`,
     );
@@ -203,6 +220,10 @@ export class FacturaService {
     return this.solicitar<FacturaOpcionesDTO>(`${this.datosMaestrosUrl}/opciones-factura`);
   }
 
+  async obtenerInfoSistema(): Promise<SistemaInfoDTO> {
+    return this.solicitar<SistemaInfoDTO>(`${this.datosMaestrosUrl}/info-sistema`);
+  }
+
   async obtenerOpcionesAltaArticulo(): Promise<ArticuloAltaOpcionesDTO> {
     const response = await this.solicitar<unknown>(`${this.datosMaestrosUrl}/articulos/opciones`);
     return articuloAltaOpcionesDTO(response);
@@ -222,6 +243,94 @@ export class FacturaService {
     return entidadCreadaDTO(response);
   }
 
+  async crearCliente(cliente: ClienteRequestDTO): Promise<EntidadCreadaDTO> {
+    const response = await this.solicitar<unknown>(`${this.datosMaestrosUrl}/clientes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cliente),
+    });
+    return entidadCreadaDTO(response);
+  }
+
+  async actualizarCliente(id: number, cliente: ClienteRequestDTO): Promise<EntidadCreadaDTO> {
+    const response = await this.solicitar<unknown>(`${this.datosMaestrosUrl}/clientes/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cliente),
+    });
+    return entidadCreadaDTO(response);
+  }
+
+  async desactivarCliente(id: number, usuarioId: number): Promise<void> {
+    await this.solicitar<void>(
+      `${this.datosMaestrosUrl}/clientes/${id}?usuarioId=${encodeURIComponent(usuarioId)}`,
+      { method: "DELETE" },
+    );
+  }
+
+  async obtenerArticuloEdicion(id: number): Promise<ArticuloEdicionDTO> {
+    return this.solicitar<ArticuloEdicionDTO>(`${this.datosMaestrosUrl}/articulos/${id}`);
+  }
+
+  async actualizarArticulo(
+    id: number,
+    articulo: ArticuloAltaRequestDTO,
+  ): Promise<EntidadCreadaDTO> {
+    const response = await this.solicitar<unknown>(`${this.datosMaestrosUrl}/articulos/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(articulo),
+    });
+    return entidadCreadaDTO(response);
+  }
+
+  async desactivarArticulo(id: number, usuarioId: number): Promise<void> {
+    await this.solicitar<void>(
+      `${this.datosMaestrosUrl}/articulos/${id}?usuarioId=${encodeURIComponent(usuarioId)}`,
+      { method: "DELETE" },
+    );
+  }
+
+  async buscarRubros(
+    busqueda: string,
+    pagina: number,
+    tamanio: number,
+  ): Promise<PaginaDTO<CatalogoItemDTO>> {
+    return this.buscarCatalogo("rubros", busqueda, pagina, tamanio);
+  }
+
+  async buscarMarcas(
+    busqueda: string,
+    pagina: number,
+    tamanio: number,
+  ): Promise<PaginaDTO<CatalogoItemDTO>> {
+    return this.buscarCatalogo("marcas", busqueda, pagina, tamanio);
+  }
+
+  async crearRubro(request: RubroRequestDTO): Promise<EntidadCreadaDTO> {
+    return this.guardarCatalogo("rubros", null, request);
+  }
+
+  async actualizarRubro(id: number, request: RubroRequestDTO): Promise<EntidadCreadaDTO> {
+    return this.guardarCatalogo("rubros", id, request);
+  }
+
+  async desactivarRubro(id: number, usuarioId: number): Promise<void> {
+    return this.desactivarCatalogo("rubros", id, usuarioId);
+  }
+
+  async crearMarca(request: MarcaRequestDTO): Promise<EntidadCreadaDTO> {
+    return this.guardarCatalogo("marcas", null, request);
+  }
+
+  async actualizarMarca(id: number, request: MarcaRequestDTO): Promise<EntidadCreadaDTO> {
+    return this.guardarCatalogo("marcas", id, request);
+  }
+
+  async desactivarMarca(id: number, usuarioId: number): Promise<void> {
+    return this.desactivarCatalogo("marcas", id, usuarioId);
+  }
+
   // CONSIGNA ESCRITURA - 6.b: GET con filtros opcionales.
   async obtenerFacturas(filtros: FacturaFiltrosDTO): Promise<FacturaReporteDTO[]> {
     const parametros = new URLSearchParams();
@@ -236,6 +345,12 @@ export class FacturaService {
     return facturaVistaDTO(await this.solicitar<unknown>(`${this.url}/${id}`));
   }
 
+  abrirFacturaPdf(id: number): boolean {
+    const ventana = window.open(`${this.url}/${id}/pdf`, "_blank");
+    if (ventana) ventana.opener = null;
+    return ventana != null;
+  }
+
   // CONSIGNA ESCRITURA - 6.b: POST de una factura completa.
   async crearFactura(factura: FacturaRequestDTO): Promise<FacturaReporteDTO> {
     const response = await this.solicitar<unknown>(this.url, {
@@ -244,6 +359,18 @@ export class FacturaService {
       body: JSON.stringify(factura),
     });
     return facturaReporteDTO(response);
+  }
+
+  async emitirFactura(id: number): Promise<ArcaEmisionDTO> {
+    return this.solicitar<ArcaEmisionDTO>(`${this.url}/${id}/emitir`, { method: "POST" });
+  }
+
+  async anularFactura(id: number): Promise<FacturaReporteDTO> {
+    return facturaReporteDTO(await this.solicitar<unknown>(`${this.url}/${id}/anular`, { method: "POST" }));
+  }
+
+  async obtenerConfiguracionArca(): Promise<ArcaConfiguracionDTO> {
+    return this.solicitar<ArcaConfiguracionDTO>(`${this.url}/arca/configuracion`);
   }
 
   async actualizarFactura(id: number, factura: FacturaRequestDTO): Promise<FacturaReporteDTO> {
@@ -255,31 +382,61 @@ export class FacturaService {
     return facturaReporteDTO(response);
   }
 
-  // CONSIGNA ESCRITURA - 6.b: PUT parcial para anular o cambiar el estado.
-  async actualizarEstado(
-    id: number,
-    estado: string,
-    observaciones?: string,
-  ): Promise<FacturaReporteDTO> {
-    const cambios: Partial<FacturaRequestDTO> = { estado, observaciones };
-    const response = await this.solicitar<unknown>(`${this.url}/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(cambios),
-    });
-    return facturaReporteDTO(response);
-  }
-
   // CONSIGNA ESCRITURA - 6.b: DELETE sin cuerpo de respuesta.
   async eliminarFactura(id: number): Promise<void> {
     await this.solicitar<void>(`${this.url}/${id}`, { method: "DELETE" });
+  }
+
+  private async buscarCatalogo(
+    recurso: "rubros" | "marcas",
+    busqueda: string,
+    pagina: number,
+    tamanio: number,
+  ): Promise<PaginaDTO<CatalogoItemDTO>> {
+    const parametros = new URLSearchParams({
+      busqueda,
+      pagina: String(pagina),
+      tamanio: String(tamanio),
+    });
+    return this.solicitar<PaginaDTO<CatalogoItemDTO>>(
+      `${this.datosMaestrosUrl}/${recurso}?${parametros.toString()}`,
+    );
+  }
+
+  private async guardarCatalogo(
+    recurso: "rubros" | "marcas",
+    id: number | null,
+    request: RubroRequestDTO | MarcaRequestDTO,
+  ): Promise<EntidadCreadaDTO> {
+    const response = await this.solicitar<unknown>(
+      `${this.datosMaestrosUrl}/${recurso}${id == null ? "" : `/${id}`}`,
+      {
+        method: id == null ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      },
+    );
+    return entidadCreadaDTO(response);
+  }
+
+  private async desactivarCatalogo(
+    recurso: "rubros" | "marcas",
+    id: number,
+    usuarioId: number,
+  ): Promise<void> {
+    await this.solicitar<void>(
+      `${this.datosMaestrosUrl}/${recurso}/${id}?usuarioId=${encodeURIComponent(usuarioId)}`,
+      { method: "DELETE" },
+    );
   }
 
   private async solicitar<T>(url: string, opciones?: RequestInit): Promise<T> {
     const respuesta = await fetch(url, opciones);
     if (!respuesta.ok) {
       const error = await respuesta.json().catch(() => ({})) as ApiError;
-      throw new Error(error.mensaje ?? `Error HTTP ${respuesta.status}`);
+      const fieldErrors = error.fieldErrors ? Object.entries(error.fieldErrors)
+        .map(([field, message]) => `${field}: ${message}`).join("; ") : null;
+      throw new Error(fieldErrors ?? error.detail ?? error.mensaje ?? `Error HTTP ${respuesta.status}`);
     }
     if (respuesta.status === 204) return undefined as T;
     return await respuesta.json() as T;

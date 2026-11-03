@@ -3,6 +3,7 @@ import type { ArticuloDisponibleDTO } from "./models/factura.dto";
 import { money } from "./formatters";
 import { PaginatedExplorerModal, type ExplorerColumn } from "./PaginatedExplorerModal";
 import { FacturaService } from "./services/FacturaService";
+import { priceListTier, shortPriceListLabel } from "./price-list-labels";
 
 interface PriceArticleExplorerModalProps {
   open: boolean;
@@ -21,7 +22,7 @@ export function PriceArticleExplorerModal({ open, service, listaPrecioId, listaP
     { header: "Artículo", render: (article) => article.denominacion, searchValue: (article) => article.denominacion },
     { header: "Rubro", render: (article) => article.rubro, searchValue: (article) => `${article.rubroCodigo} ${article.rubro}` },
     { header: "Marca", render: (article) => article.marca ?? "—", searchValue: (article) => `${article.marcaCodigo ?? ""} ${article.marca ?? ""}` },
-    { header: "Lista", render: (article) => <>{article.listaPrecio}<small>{article.listaPrecioCodigo}</small></>, searchValue: (article) => `${article.listaPrecioId} ${article.listaPrecioCodigo} ${article.listaPrecio}` },
+    { header: "Lista", render: (article) => <span className="price-list-name" data-price-tier={priceListTier(article.listaPrecioCodigo)}>{shortPriceListLabel(article.listaPrecioCodigo)}</span>, searchValue: (article) => `${article.listaPrecioId} ${article.listaPrecioCodigo}` },
     { header: "Precio", render: (article) => money(article.precioVenta), searchValue: (article) => article.precioVenta, align: "right" },
   ], []);
   const loadPage = useCallback(

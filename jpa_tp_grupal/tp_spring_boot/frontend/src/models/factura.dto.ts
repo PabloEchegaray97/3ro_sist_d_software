@@ -1,8 +1,8 @@
 // CONSIGNA ESCRITURA - 4.a, 5.a y 5.b: espejo exacto de los DTOs Java.
 export interface FacturaReporteDTO {
   id: number;
-  numeroFactura: number;
-  fechaEmision: string;
+  numeroFactura: number | null;
+  fechaEmision: string | null;
   clienteDenominacion: string;
   condicionIva: string;
   puntoVentaDescripcion: string;
@@ -40,18 +40,26 @@ export interface FacturaDetalleVistaDTO {
 
 export interface FacturaVistaDTO {
   id: number;
-  numero: number;
-  fechaEmision: string;
+  numero: number | null;
+  fechaEmision: string | null;
   puntoVentaId: number;
+  puntoVentaNumero: number;
   puntoVentaDescripcion: string;
+  puntoVentaDomicilio: string | null;
+  tipoComprobante: number;
   clienteId: number | null;
   clienteDenominacion: string;
+  clienteCuitCuil: string | null;
+  clienteTelefono: string | null;
+  clienteEmail: string | null;
+  clienteDomicilio: string | null;
   listaPrecioId: number | null;
   listaPrecioCodigo: string | null;
   listaPrecio: string | null;
   condicionIvaId: number;
   condicionIva: string;
   tipoMonedaId: number;
+  tipoMonedaCodigo: string;
   tipoMoneda: string;
   usuarioId: number;
   usuario: string;
@@ -61,7 +69,58 @@ export interface FacturaVistaDTO {
   importeTotal: number;
   observaciones: string | null;
   fechaAnulacion: string | null;
+  cae: string | null;
+  caeFechaVencimiento: string | null;
+  resultadoAfip: string | null;
+  motivoRechazo: string | null;
   detalles: FacturaDetalleVistaDTO[];
+}
+
+export interface MensajeDTO {
+  tipo: string;
+  codigo: string;
+  descripcion: string;
+}
+
+export interface ArcaEmisionDTO {
+  emitida: boolean;
+  facturaId: number;
+  numero: number | null;
+  estado: string;
+  cae: string | null;
+  caeFechaVencimiento: string | null;
+  mensaje: string;
+  mensajes: MensajeDTO[];
+}
+
+export interface ArcaAutenticacionDTO {
+  autenticada: boolean;
+  ambiente: string;
+  servicio: string;
+  vencimiento: string | null;
+  mensaje: string;
+}
+
+export interface ArcaConfiguracionDTO {
+  ambiente: string;
+  cuit: string | null;
+  condicionIvaEmisor: string;
+  razonSocialEmisor: string;
+  ingresosBrutosEmisor: string;
+  inicioActividadesEmisor: string;
+  telefonoEmisor: string;
+  logoPath: string;
+  tipoComprobanteCodigo: number;
+  tipoComprobanteDescripcion: string;
+  cuitConfigurado: boolean;
+  keystorePath: string | null;
+  keystoreConfigurado: boolean;
+  keystoreExiste: boolean;
+  passwordConfigurada: boolean;
+  wsaaUrl: string;
+  wsfeUrl: string;
+  endpointsHomologacion: boolean;
+  listaParaProbar: boolean;
 }
 
 export interface ArticuloDisponibleDTO {
@@ -75,7 +134,6 @@ export interface ArticuloDisponibleDTO {
   marca: string | null;
   listaPrecioId: number;
   listaPrecioCodigo: string;
-  listaPrecio: string;
   precioVenta: number;
 }
 
@@ -117,7 +175,6 @@ export interface ClienteOpcionDTO extends OpcionDTO {
 }
 
 export interface FacturaOpcionesDTO {
-  siguienteNumero: number;
   puntosVenta: OpcionDTO[];
   clientes: ClienteOpcionDTO[];
   condicionesIva: OpcionDTO[];
@@ -128,15 +185,12 @@ export interface FacturaOpcionesDTO {
 }
 
 export interface FacturaRequestDTO {
-  numero: number;
-  fechaEmision: string;
   puntoVentaId: number;
   clienteId: number | null;
   listaPrecioId: number;
   condicionIvaId: number;
   tipoMonedaId: number;
   usuarioId: number;
-  estado: string;
   importeCobrado: number | null;
   observaciones: string | null;
   detalles: FacturaDetalleRequestDTO[];
@@ -150,6 +204,34 @@ export interface FacturaFiltrosDTO {
 }
 
 // Espejo de DatosMaestrosDTO.java para mantener iguales los contratos de escritura.
+export interface UsuarioRequestDTO {
+  usuario: string;
+  clave: string;
+  nombre: string;
+  apellido: string;
+}
+
+export interface CondicionIvaRequestDTO {
+  codigoAfip: number;
+  denominacion: string;
+  usuarioId: number;
+}
+
+export interface TipoMonedaRequestDTO {
+  codigoAfip: string;
+  denominacion: string;
+  simbolo: string;
+  usuarioId: number;
+}
+
+export interface PuntoVentaRequestDTO {
+  numero: number;
+  descripcion: string;
+  tipoEmision: string;
+  domicilioComercial: string;
+  usuarioId: number;
+}
+
 export interface ClienteRequestDTO {
   cuitCuil: string;
   denominacion: string;
@@ -181,6 +263,14 @@ export interface ListaPrecioArticuloRequestDTO {
   usuarioId: number;
 }
 
+export interface ArticuloRequestDTO {
+  codigo: string;
+  denominacion: string;
+  rubroId: number;
+  marcaId: number | null;
+  usuarioId: number;
+}
+
 export interface ArticuloAltaOpcionDTO {
   id: number;
   descripcion: string;
@@ -205,7 +295,7 @@ export interface ArticuloAltaPrecioRequestDTO {
 }
 
 export interface ArticuloAltaRequestDTO {
-  codigo: string;
+  codigo: string | null;
   denominacion: string;
   rubroId: number;
   marcaId: number | null;
@@ -213,7 +303,80 @@ export interface ArticuloAltaRequestDTO {
   precios: ArticuloAltaPrecioRequestDTO[];
 }
 
+export interface ArticuloEdicionDTO {
+  id: number;
+  codigo: string;
+  denominacion: string;
+  rubroId: number;
+  marcaId: number | null;
+  precios: ArticuloAltaPrecioRequestDTO[];
+}
+
 export interface EntidadCreadaDTO {
   id: number;
   descripcion: string;
+}
+
+export interface CatalogoItemDTO {
+  id: number;
+  codigo: number;
+  denominacion: string;
+  fechaAlta: string;
+}
+
+export interface RubroRequestDTO {
+  denominacion: string;
+  usuarioId: number;
+}
+
+export interface MarcaRequestDTO {
+  denominacion: string;
+  usuarioId: number;
+}
+
+export interface SistemaInfoDTO {
+  puntosVenta: PuntoVentaInfoDTO[];
+  condicionesIva: CondicionIvaInfoDTO[];
+  monedas: MonedaInfoDTO[];
+  listasPrecio: ListaPrecioInfoDTO[];
+  usuario: UsuarioInfoDTO | null;
+}
+
+export interface PuntoVentaInfoDTO {
+  id: number;
+  numero: number;
+  descripcion: string;
+  tipoEmision: string | null;
+  domicilioComercial: string | null;
+}
+
+export interface CondicionIvaInfoDTO {
+  id: number;
+  codigoAfip: number;
+  denominacion: string;
+}
+
+export interface MonedaInfoDTO {
+  id: number;
+  codigoAfip: string;
+  denominacion: string;
+  simbolo: string;
+}
+
+export interface ListaPrecioInfoDTO {
+  id: number;
+  codigo: string;
+  denominacion: string;
+}
+
+export interface UsuarioInfoDTO {
+  id: number;
+  usuario: string;
+  nombreCompleto: string;
+}
+
+export interface TotalMonedaDTO {
+  codigoMoneda: string;
+  moneda: string;
+  total: number;
 }

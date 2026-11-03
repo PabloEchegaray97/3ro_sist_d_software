@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.Date;
+import java.math.BigDecimal;
+import com.example.demo.model.EstadoFactura;
 
 // CONSIGNA - PARTE 2.1 y 2.2: DTO ejecutivo definido mediante Lombok.
 // CONSIGNA ESCRITURA - 4.a y 5.b: id identifica la fila para PUT y DELETE.
@@ -23,7 +25,7 @@ public class FacturaReporteDTO {
     private String clienteDenominacion;
     private String condicionIva;
     private String puntoVentaDescripcion;
-    private double importeTotal;
+    private BigDecimal importeTotal;
     private long cantidadItems;
-    private String estado;
+    private EstadoFactura estado;
 }

@@ -4,9 +4,12 @@ import com.example.demo.dto.DatosMaestrosDTO;
 import com.example.demo.dto.EntidadCreadaDTO;
 import com.example.demo.dto.ArticuloDisponibleDTO;
 import com.example.demo.dto.ArticuloAltaDTO;
+import com.example.demo.dto.ArticuloEdicionDTO;
 import com.example.demo.dto.ClienteDisponibleDTO;
+import com.example.demo.dto.CatalogoItemDTO;
 import com.example.demo.dto.PaginaDTO;
 import com.example.demo.dto.FacturaOpcionesDTO;
+import com.example.demo.dto.SistemaInfoDTO;
 import com.example.demo.model.Articulo;
 import com.example.demo.model.AuditoriaApp;
 import com.example.demo.model.Cliente;
@@ -29,6 +32,10 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import com.example.demo.exception.PrecisionMonetariaException;
 
 @Service
 public class DatosMaestrosService {
@@ -176,11 +183,11 @@ public class DatosMaestrosService {
         Rubro rubro = buscarOCrearRubroCatalogo(admin);
         Marca marca = buscarOCrearMarcaCatalogo(admin);
         List<ArticuloSemilla> articulos = List.of(
-                new ArticuloSemilla("ART-001", "Teclado mecánico", 45000, 39000),
-                new ArticuloSemilla("ART-002", "Mouse inalámbrico", 25000, 21500),
-                new ArticuloSemilla("ART-003", "Monitor 24 pulgadas", 180000, 158000),
-                new ArticuloSemilla("ART-004", "Auriculares USB", 38000, 32500),
-                new ArticuloSemilla("ART-005", "Webcam Full HD", 52000, 44500)
+                new ArticuloSemilla("ART-001", "Teclado mecánico", new BigDecimal("45000"), new BigDecimal("39000")),
+                new ArticuloSemilla("ART-002", "Mouse inalámbrico", new BigDecimal("25000"), new BigDecimal("21500")),
+                new ArticuloSemilla("ART-003", "Monitor 24 pulgadas", new BigDecimal("180000"), new BigDecimal("158000")),
+                new ArticuloSemilla("ART-004", "Auriculares USB", new BigDecimal("38000"), new BigDecimal("32500")),
+                new ArticuloSemilla("ART-005", "Webcam Full HD", new BigDecimal("52000"), new BigDecimal("44500"))
         );
 
         for (ArticuloSemilla datos : articulos) {
@@ -327,7 +334,7 @@ public class DatosMaestrosService {
     private void crearPrecioSiFalta(
             ListaPrecio lista,
             Articulo articulo,
-            double precioVenta,
+            BigDecimal precioVenta,
             Usuario usuario
     ) {
         boolean existe = entityManager.createQuery("""
@@ -343,7 +350,7 @@ public class DatosMaestrosService {
             ListaPrecioArticulo precio = auditar(new ListaPrecioArticulo(), usuario);
             precio.setListaPrecio(lista);
             precio.setArticulo(articulo);
-            precio.setPrecioVenta(precioVenta);
+            precio.setPrecioVenta(moneda(precioVenta, "precioVenta"));
             entityManager.persist(precio);
         }
     }
@@ -364,7 +371,9 @@ public class DatosMaestrosService {
         int tamanioSeguro = Math.max(1, Math.min(tamanio, 100));
         String patron = patron(busqueda);
         String filtro = """
-                WHERE (:listaPrecioId IS NULL OR lista.id = :listaPrecioId)
+                WHERE articulo.fechaBaja IS NULL
+                AND precio.fechaBaja IS NULL
+                AND (:listaPrecioId IS NULL OR lista.id = :listaPrecioId)
                 AND (:patron = '%%' OR
                     LOWER(CAST(precio.id AS string)) LIKE :patron OR
                     LOWER(CAST(articulo.id AS string)) LIKE :patron OR
@@ -392,7 +401,6 @@ public class DatosMaestrosService {
                     marca.denominacion,
                     lista.id,
                     lista.codigo,
-                    lista.denominacion,
                     precio.precioVenta
                 )
                 FROM ListaPrecioArticulo precio
@@ -435,7 +443,7 @@ public class DatosMaestrosService {
         int tamanioSeguro = Math.max(1, Math.min(tamanio, 100));
         String patron = patron(busqueda);
         String filtro = """
-                WHERE :patron = '%%' OR
+                WHERE cliente.fechaBaja IS NULL AND (:patron = '%%' OR
                     LOWER(CAST(cliente.id AS string)) LIKE :patron OR
                     LOWER(cliente.cuitCuil) LIKE :patron OR
                     LOWER(cliente.denominacion) LIKE :patron OR
@@ -449,7 +457,7 @@ public class DatosMaestrosService {
                     LOWER(CAST(listaCliente.id AS string)) LIKE :patron OR
                     LOWER(COALESCE(listaCliente.codigo, '')) LIKE :patron OR
                     LOWER(COALESCE(listaCliente.denominacion, '')) LIKE :patron OR
-                    LOWER(CAST(cliente.fechaAlta AS string)) LIKE :patron
+                    LOWER(CAST(cliente.fechaAlta AS string)) LIKE :patron)
                 """;
 
         List<ClienteDisponibleDTO> contenido = entityManager.createQuery("""
@@ -521,11 +529,6 @@ public class DatosMaestrosService {
 
     @Transactional(readOnly = true)
     public FacturaOpcionesDTO buscarOpcionesFactura() {
-        Long siguienteNumero = entityManager.createQuery(
-                "SELECT COALESCE(MAX(f.numero), 0) + 1 FROM FacturaVenta f",
-                Long.class
-        ).getSingleResult();
-
         List<FacturaOpcionesDTO.OpcionDTO> puntosVenta = entityManager.createQuery(
                         "SELECT p FROM PuntoVenta p ORDER BY p.numero",
                         PuntoVenta.class
@@ -589,7 +592,6 @@ public class DatosMaestrosService {
                 : opcion(listaMinorista.getId(), listaMinorista.getDenominacion());
 
         return new FacturaOpcionesDTO(
-                siguienteNumero,
                 puntosVenta,
                 clientes,
                 condicionesIva,
@@ -601,9 +603,52 @@ public class DatosMaestrosService {
     }
 
     @Transactional(readOnly = true)
+    public SistemaInfoDTO buscarInfoSistema() {
+        List<SistemaInfoDTO.PuntoVentaInfo> puntosVenta = entityManager.createQuery(
+                        "SELECT p FROM PuntoVenta p WHERE p.fechaBaja IS NULL ORDER BY p.numero",
+                        PuntoVenta.class
+                ).getResultList().stream()
+                .map(p -> new SistemaInfoDTO.PuntoVentaInfo(
+                        p.getId(), p.getNumero(), p.getDescripcion(), p.getTipoEmision(), p.getDomicilioComercial()
+                ))
+                .toList();
+        List<SistemaInfoDTO.CondicionIvaInfo> condicionesIva = entityManager.createQuery(
+                        "SELECT c FROM CondicionIva c WHERE c.fechaBaja IS NULL ORDER BY c.codigoAfip",
+                        CondicionIva.class
+                ).getResultList().stream()
+                .map(c -> new SistemaInfoDTO.CondicionIvaInfo(c.getId(), c.getCodigoAfip(), c.getDenominacion()))
+                .toList();
+        List<SistemaInfoDTO.MonedaInfo> monedas = entityManager.createQuery(
+                        "SELECT m FROM TipoMoneda m WHERE m.fechaBaja IS NULL ORDER BY m.denominacion",
+                        TipoMoneda.class
+                ).getResultList().stream()
+                .map(m -> new SistemaInfoDTO.MonedaInfo(
+                        m.getId(), m.getCodigoAfip(), m.getDenominacion(), m.getSimbolo()
+                ))
+                .toList();
+        List<SistemaInfoDTO.ListaPrecioInfo> listasPrecio = entityManager.createQuery(
+                        "SELECT l FROM ListaPrecio l WHERE l.fechaBaja IS NULL ORDER BY l.denominacion",
+                        ListaPrecio.class
+                ).getResultList().stream()
+                .map(l -> new SistemaInfoDTO.ListaPrecioInfo(l.getId(), l.getCodigo(), l.getDenominacion()))
+                .toList();
+        SistemaInfoDTO.UsuarioInfo usuario = entityManager.createQuery(
+                        "SELECT u FROM Usuario u WHERE LOWER(u.usuario) = 'admin' ORDER BY u.id",
+                        Usuario.class
+                ).setMaxResults(1)
+                .getResultStream()
+                .findFirst()
+                .map(u -> new SistemaInfoDTO.UsuarioInfo(
+                        u.getId(), u.getUsuario(), (u.getNombre() + " " + u.getApellido()).trim()
+                ))
+                .orElse(null);
+        return new SistemaInfoDTO(puntosVenta, condicionesIva, monedas, listasPrecio, usuario);
+    }
+
+    @Transactional(readOnly = true)
     public ArticuloAltaDTO.Opciones buscarOpcionesAltaArticulo() {
         List<ArticuloAltaDTO.Opcion> rubros = entityManager.createQuery(
-                        "SELECT rubro FROM Rubro rubro ORDER BY rubro.denominacion",
+                        "SELECT rubro FROM Rubro rubro WHERE rubro.fechaBaja IS NULL ORDER BY rubro.denominacion",
                         Rubro.class
                 ).getResultList().stream()
                 .map(rubro -> new ArticuloAltaDTO.Opcion(
@@ -612,7 +657,7 @@ public class DatosMaestrosService {
                 ))
                 .toList();
         List<ArticuloAltaDTO.Opcion> marcas = entityManager.createQuery(
-                        "SELECT marca FROM Marca marca ORDER BY marca.denominacion",
+                        "SELECT marca FROM Marca marca WHERE marca.fechaBaja IS NULL ORDER BY marca.denominacion",
                         Marca.class
                 ).getResultList().stream()
                 .map(marca -> new ArticuloAltaDTO.Opcion(
@@ -737,6 +782,67 @@ public class DatosMaestrosService {
     }
 
     @Transactional
+    public EntidadCreadaDTO actualizarCliente(
+            Long clienteId,
+            DatosMaestrosDTO.ClienteRequest request
+    ) {
+        if (request == null) {
+            throw new IllegalArgumentException("El cuerpo de la solicitud es obligatorio");
+        }
+        Cliente cliente = buscar(Cliente.class, clienteId, "clienteId");
+        if (cliente.getFechaBaja() != null) {
+            throw new IllegalArgumentException("No se puede editar un cliente inactivo");
+        }
+        Usuario usuario = usuario(request.usuarioId());
+        CondicionIva condicionIva = buscar(
+                CondicionIva.class,
+                request.condicionIvaId(),
+                "condicionIvaId"
+        );
+        requerido(request.cuitCuil(), "cuitCuil");
+        requerido(request.denominacion(), "denominacion");
+
+        cliente.setCuitCuil(request.cuitCuil().trim());
+        cliente.setDenominacion(request.denominacion().trim());
+        cliente.setCondicionIva(condicionIva);
+        cliente.setListaPrecioPredeterminada(
+                request.listaPrecioId() == null
+                        ? buscarListaPrecioMinorista()
+                        : buscar(ListaPrecio.class, request.listaPrecioId(), "listaPrecioId")
+        );
+
+        Contacto contacto = cliente.getContacto();
+        if (contacto == null) {
+            contacto = new Contacto();
+            cliente.setContacto(contacto);
+        }
+        contacto.setEmail(request.email());
+        contacto.setTelefono(request.telefono());
+        contacto.setCelular(request.celular());
+
+        Domicilio domicilio = cliente.getDomicilio();
+        if (domicilio == null) {
+            domicilio = new Domicilio();
+            cliente.setDomicilio(domicilio);
+        }
+        domicilio.setNombreCalle(request.nombreCalle());
+        domicilio.setNumeroCalle(request.numeroCalle());
+        actualizarAuditoria(cliente, usuario);
+        entityManager.flush();
+        return new EntidadCreadaDTO(cliente.getId(), cliente.getDenominacion());
+    }
+
+    @Transactional
+    public void desactivarCliente(Long clienteId, Long usuarioId) {
+        Cliente cliente = buscar(Cliente.class, clienteId, "clienteId");
+        Usuario usuario = usuario(usuarioId);
+        if (cliente.getFechaBaja() == null) {
+            marcarComoInactivo(cliente, usuario);
+            entityManager.flush();
+        }
+    }
+
+    @Transactional
     public EntidadCreadaDTO actualizarListaPrecioCliente(
             Long clienteId,
             DatosMaestrosDTO.ClienteListaPrecioRequest request
@@ -755,9 +861,36 @@ public class DatosMaestrosService {
         Usuario usuario = usuario(request.usuarioId());
         requerido(request.denominacion(), "denominacion");
         Rubro entidad = auditar(new Rubro(), usuario);
-        entidad.setCodigo(request.codigo());
+        entidad.setCodigo(0);
         entidad.setDenominacion(request.denominacion().trim());
-        return persistir(entidad, entidad.getDenominacion());
+        entityManager.persist(entidad);
+        entityManager.flush();
+        entidad.setCodigo(Math.toIntExact(entidad.getId()));
+        return new EntidadCreadaDTO(entidad.getId(), entidad.getDenominacion());
+    }
+
+    @Transactional(readOnly = true)
+    public PaginaDTO<CatalogoItemDTO> buscarRubros(String busqueda, int pagina, int tamanio) {
+        return buscarCatalogo(Rubro.class, busqueda, pagina, tamanio);
+    }
+
+    @Transactional
+    public EntidadCreadaDTO actualizarRubro(Long rubroId, DatosMaestrosDTO.RubroRequest request) {
+        Rubro rubro = buscar(Rubro.class, rubroId, "rubroId");
+        validarActivo(rubro, "rubro");
+        Usuario usuario = usuario(request.usuarioId());
+        requerido(request.denominacion(), "denominacion");
+        rubro.setDenominacion(request.denominacion().trim());
+        actualizarAuditoria(rubro, usuario);
+        return new EntidadCreadaDTO(rubro.getId(), rubro.getDenominacion());
+    }
+
+    @Transactional
+    public void desactivarRubro(Long rubroId, Long usuarioId) {
+        Rubro rubro = buscar(Rubro.class, rubroId, "rubroId");
+        if (rubro.getFechaBaja() == null) {
+            marcarComoInactivo(rubro, usuario(usuarioId));
+        }
     }
 
     @Transactional
@@ -765,15 +898,41 @@ public class DatosMaestrosService {
         Usuario usuario = usuario(request.usuarioId());
         requerido(request.denominacion(), "denominacion");
         Marca entidad = auditar(new Marca(), usuario);
-        entidad.setCodigo(request.codigo());
+        entidad.setCodigo(0);
         entidad.setDenominacion(request.denominacion().trim());
-        return persistir(entidad, entidad.getDenominacion());
+        entityManager.persist(entidad);
+        entityManager.flush();
+        entidad.setCodigo(Math.toIntExact(entidad.getId()));
+        return new EntidadCreadaDTO(entidad.getId(), entidad.getDenominacion());
+    }
+
+    @Transactional(readOnly = true)
+    public PaginaDTO<CatalogoItemDTO> buscarMarcas(String busqueda, int pagina, int tamanio) {
+        return buscarCatalogo(Marca.class, busqueda, pagina, tamanio);
+    }
+
+    @Transactional
+    public EntidadCreadaDTO actualizarMarca(Long marcaId, DatosMaestrosDTO.MarcaRequest request) {
+        Marca marca = buscar(Marca.class, marcaId, "marcaId");
+        validarActivo(marca, "marca");
+        Usuario usuario = usuario(request.usuarioId());
+        requerido(request.denominacion(), "denominacion");
+        marca.setDenominacion(request.denominacion().trim());
+        actualizarAuditoria(marca, usuario);
+        return new EntidadCreadaDTO(marca.getId(), marca.getDenominacion());
+    }
+
+    @Transactional
+    public void desactivarMarca(Long marcaId, Long usuarioId) {
+        Marca marca = buscar(Marca.class, marcaId, "marcaId");
+        if (marca.getFechaBaja() == null) {
+            marcarComoInactivo(marca, usuario(usuarioId));
+        }
     }
 
     @Transactional
     public EntidadCreadaDTO crearListaPrecio(DatosMaestrosDTO.ListaPrecioRequest request) {
         Usuario usuario = usuario(request.usuarioId());
-        requerido(request.codigo(), "codigo");
         requerido(request.denominacion(), "denominacion");
         Long listasConCodigo = entityManager.createQuery(
                         "SELECT COUNT(lista) FROM ListaPrecio lista WHERE UPPER(lista.codigo) = :codigo",
@@ -822,16 +981,6 @@ public class DatosMaestrosService {
         Marca marca = request.marcaId() == null
                 ? null
                 : buscar(Marca.class, request.marcaId(), "marcaId");
-        String codigo = request.codigo().trim().toUpperCase();
-        boolean codigoExistente = entityManager.createQuery(
-                        "SELECT COUNT(articulo) FROM Articulo articulo WHERE UPPER(articulo.codigo) = :codigo",
-                        Long.class
-                ).setParameter("codigo", codigo)
-                .getSingleResult() > 0;
-        if (codigoExistente) {
-            throw new IllegalArgumentException("Ya existe un articulo con ese codigo");
-        }
-
         Set<Long> listasUsadas = new HashSet<>();
         for (ArticuloAltaDTO.PrecioRequest precio : request.precios()) {
             if (precio == null || precio.listaPrecioId() == null) {
@@ -840,17 +989,19 @@ public class DatosMaestrosService {
             if (!listasUsadas.add(precio.listaPrecioId())) {
                 throw new IllegalArgumentException("No se puede repetir una lista de precios");
             }
-            if (precio.precioVenta() < 0) {
+            if (precio.precioVenta() == null || precio.precioVenta().signum() < 0) {
                 throw new IllegalArgumentException("precioVenta no puede ser negativo");
             }
         }
 
         Articulo articulo = auditar(new Articulo(), usuario);
-        articulo.setCodigo(codigo);
+        articulo.setCodigo("PENDIENTE-" + UUID.randomUUID());
         articulo.setDenominacion(request.denominacion().trim());
         articulo.setRubro(rubro);
         articulo.setMarca(marca);
         entityManager.persist(articulo);
+        entityManager.flush();
+        articulo.setCodigo("ART-" + String.format("%06d", articulo.getId()));
 
         for (ArticuloAltaDTO.PrecioRequest solicitudPrecio : request.precios()) {
             ListaPrecio lista = buscar(
@@ -861,11 +1012,144 @@ public class DatosMaestrosService {
             ListaPrecioArticulo precio = auditar(new ListaPrecioArticulo(), usuario);
             precio.setArticulo(articulo);
             precio.setListaPrecio(lista);
-            precio.setPrecioVenta(solicitudPrecio.precioVenta());
+            precio.setPrecioVenta(moneda(solicitudPrecio.precioVenta(), "precioVenta"));
             entityManager.persist(precio);
         }
         entityManager.flush();
         return new EntidadCreadaDTO(articulo.getId(), articulo.getDenominacion());
+    }
+
+    @Transactional(readOnly = true)
+    public ArticuloEdicionDTO obtenerArticuloEdicion(Long articuloId) {
+        Articulo articulo = buscar(Articulo.class, articuloId, "articuloId");
+        if (articulo.getFechaBaja() != null) {
+            throw new IllegalArgumentException("El articulo esta inactivo");
+        }
+        List<ArticuloEdicionDTO.PrecioDTO> precios = entityManager.createQuery("""
+                        SELECT precio
+                        FROM ListaPrecioArticulo precio
+                        JOIN FETCH precio.listaPrecio lista
+                        WHERE precio.articulo = :articulo
+                          AND precio.fechaBaja IS NULL
+                        ORDER BY lista.denominacion
+                        """, ListaPrecioArticulo.class)
+                .setParameter("articulo", articulo)
+                .getResultList().stream()
+                .map(precio -> new ArticuloEdicionDTO.PrecioDTO(
+                        precio.getListaPrecio().getId(),
+                        precio.getPrecioVenta()
+                ))
+                .toList();
+        return new ArticuloEdicionDTO(
+                articulo.getId(),
+                articulo.getCodigo(),
+                articulo.getDenominacion(),
+                articulo.getRubro().getId(),
+                articulo.getMarca() == null ? null : articulo.getMarca().getId(),
+                precios
+        );
+    }
+
+    @Transactional
+    public EntidadCreadaDTO actualizarArticuloConPrecios(
+            Long articuloId,
+            ArticuloAltaDTO.CrearRequest request
+    ) {
+        Articulo articulo = buscar(Articulo.class, articuloId, "articuloId");
+        if (articulo.getFechaBaja() != null) {
+            throw new IllegalArgumentException("No se puede editar un articulo inactivo");
+        }
+        validarArticuloConPrecios(request);
+
+        Usuario usuario = usuario(request.usuarioId());
+        articulo.setDenominacion(request.denominacion().trim());
+        articulo.setRubro(buscar(Rubro.class, request.rubroId(), "rubroId"));
+        articulo.setMarca(request.marcaId() == null
+                ? null
+                : buscar(Marca.class, request.marcaId(), "marcaId"));
+        actualizarAuditoria(articulo, usuario);
+
+        List<ListaPrecioArticulo> preciosExistentes = entityManager.createQuery("""
+                        SELECT precio
+                        FROM ListaPrecioArticulo precio
+                        JOIN FETCH precio.listaPrecio
+                        WHERE precio.articulo = :articulo
+                        """, ListaPrecioArticulo.class)
+                .setParameter("articulo", articulo)
+                .getResultList();
+        Set<Long> listasSeleccionadas = new HashSet<>();
+
+        for (ArticuloAltaDTO.PrecioRequest solicitud : request.precios()) {
+            Long listaId = solicitud.listaPrecioId();
+            listasSeleccionadas.add(listaId);
+            ListaPrecioArticulo precio = preciosExistentes.stream()
+                    .filter(item -> item.getListaPrecio().getId().equals(listaId))
+                    .findFirst()
+                    .orElse(null);
+            if (precio == null) {
+                precio = auditar(new ListaPrecioArticulo(), usuario);
+                precio.setArticulo(articulo);
+                precio.setListaPrecio(buscar(ListaPrecio.class, listaId, "listaPrecioId"));
+                entityManager.persist(precio);
+                preciosExistentes.add(precio);
+            } else {
+                precio.setFechaBaja(null);
+                precio.setUsuarioBaja(null);
+                actualizarAuditoria(precio, usuario);
+            }
+            precio.setPrecioVenta(moneda(solicitud.precioVenta(), "precioVenta"));
+        }
+
+        for (ListaPrecioArticulo precio : preciosExistentes) {
+            if (!listasSeleccionadas.contains(precio.getListaPrecio().getId())
+                    && precio.getFechaBaja() == null) {
+                marcarComoInactivo(precio, usuario);
+            }
+        }
+        entityManager.flush();
+        return new EntidadCreadaDTO(articulo.getId(), articulo.getDenominacion());
+    }
+
+    @Transactional
+    public void desactivarArticulo(Long articuloId, Long usuarioId) {
+        Articulo articulo = buscar(Articulo.class, articuloId, "articuloId");
+        Usuario usuario = usuario(usuarioId);
+        if (articulo.getFechaBaja() != null) {
+            return;
+        }
+        marcarComoInactivo(articulo, usuario);
+        entityManager.createQuery("""
+                        SELECT precio
+                        FROM ListaPrecioArticulo precio
+                        WHERE precio.articulo = :articulo
+                          AND precio.fechaBaja IS NULL
+                        """, ListaPrecioArticulo.class)
+                .setParameter("articulo", articulo)
+                .getResultList()
+                .forEach(precio -> marcarComoInactivo(precio, usuario));
+        entityManager.flush();
+    }
+
+    private void validarArticuloConPrecios(ArticuloAltaDTO.CrearRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("El cuerpo de la solicitud es obligatorio");
+        }
+        requerido(request.denominacion(), "denominacion");
+        if (request.precios() == null || request.precios().isEmpty()) {
+            throw new IllegalArgumentException("Debe seleccionar al menos una lista de precios");
+        }
+        Set<Long> listasUsadas = new HashSet<>();
+        for (ArticuloAltaDTO.PrecioRequest precio : request.precios()) {
+            if (precio == null || precio.listaPrecioId() == null) {
+                throw new IllegalArgumentException("Cada precio debe indicar listaPrecioId");
+            }
+            if (!listasUsadas.add(precio.listaPrecioId())) {
+                throw new IllegalArgumentException("No se puede repetir una lista de precios");
+            }
+            if (precio.precioVenta() == null || precio.precioVenta().signum() < 0) {
+                throw new IllegalArgumentException("precioVenta no puede ser negativo");
+            }
+        }
     }
 
     @Transactional
@@ -873,7 +1157,7 @@ public class DatosMaestrosService {
         Usuario usuario = usuario(request.usuarioId());
         ListaPrecio lista = buscar(ListaPrecio.class, request.listaPrecioId(), "listaPrecioId");
         Articulo articulo = buscar(Articulo.class, request.articuloId(), "articuloId");
-        if (request.precioVenta() < 0) {
+        if (request.precioVenta() == null || request.precioVenta().signum() < 0) {
             throw new IllegalArgumentException("precioVenta no puede ser negativo");
         }
         Long preciosExistentes = entityManager.createQuery("""
@@ -893,12 +1177,63 @@ public class DatosMaestrosService {
         ListaPrecioArticulo entidad = auditar(new ListaPrecioArticulo(), usuario);
         entidad.setListaPrecio(lista);
         entidad.setArticulo(articulo);
-        entidad.setPrecioVenta(request.precioVenta());
+        entidad.setPrecioVenta(moneda(request.precioVenta(), "precioVenta"));
         return persistir(entidad, articulo.getDenominacion());
     }
 
     private Usuario usuario(Long id) {
         return buscar(Usuario.class, id, "usuarioId");
+    }
+
+    private <T extends AuditoriaApp> PaginaDTO<CatalogoItemDTO> buscarCatalogo(
+            Class<T> tipo,
+            String busqueda,
+            int pagina,
+            int tamanio
+    ) {
+        int paginaSegura = Math.max(0, pagina);
+        int tamanioSeguro = Math.max(1, Math.min(tamanio, 100));
+        String nombreEntidad = tipo.getSimpleName();
+        String patron = patron(busqueda);
+        String filtro = " WHERE item.fechaBaja IS NULL AND (" +
+                ":patron = '%%' OR " +
+                "LOWER(CAST(item.id AS string)) LIKE :patron OR " +
+                "LOWER(CAST(item.codigo AS string)) LIKE :patron OR " +
+                "LOWER(item.denominacion) LIKE :patron)";
+
+        List<T> entidades = entityManager.createQuery(
+                        "SELECT item FROM " + nombreEntidad + " item" + filtro +
+                                " ORDER BY item.denominacion, item.id",
+                        tipo
+                ).setParameter("patron", patron)
+                .setFirstResult(paginaSegura * tamanioSeguro)
+                .setMaxResults(tamanioSeguro)
+                .getResultList();
+        List<CatalogoItemDTO> contenido = entidades.stream()
+                .map(item -> {
+                    if (item instanceof Rubro rubro) {
+                        return new CatalogoItemDTO(
+                                rubro.getId(), rubro.getCodigo(), rubro.getDenominacion(), rubro.getFechaAlta()
+                        );
+                    }
+                    Marca marca = (Marca) item;
+                    return new CatalogoItemDTO(
+                            marca.getId(), marca.getCodigo(), marca.getDenominacion(), marca.getFechaAlta()
+                    );
+                })
+                .toList();
+        long total = entityManager.createQuery(
+                        "SELECT COUNT(item.id) FROM " + nombreEntidad + " item" + filtro,
+                        Long.class
+                ).setParameter("patron", patron)
+                .getSingleResult();
+        return pagina(contenido, paginaSegura, tamanioSeguro, total);
+    }
+
+    private void validarActivo(AuditoriaApp entidad, String nombre) {
+        if (entidad.getFechaBaja() != null) {
+            throw new IllegalArgumentException("No se puede editar un " + nombre + " inactivo");
+        }
     }
 
     private <T> T buscar(Class<T> tipo, Long id, String campo) {
@@ -921,6 +1256,14 @@ public class DatosMaestrosService {
         return entidad;
     }
 
+    private void marcarComoInactivo(AuditoriaApp entidad, Usuario usuario) {
+        Date ahora = new Date();
+        entidad.setFechaBaja(ahora);
+        entidad.setUsuarioBaja(usuario);
+        entidad.setFechaModificacion(ahora);
+        entidad.setUsuarioModificacion(usuario);
+    }
+
     private EntidadCreadaDTO persistir(Object entidad, String descripcion) {
         entityManager.persist(entidad);
         entityManager.flush();
@@ -934,11 +1277,19 @@ public class DatosMaestrosService {
         }
     }
 
+    private BigDecimal moneda(BigDecimal valor, String campo) {
+        try {
+            return valor.setScale(2, RoundingMode.UNNECESSARY);
+        } catch (ArithmeticException ex) {
+            throw new PrecisionMonetariaException(campo + " admite como máximo dos decimales");
+        }
+    }
+
     private record ArticuloSemilla(
             String codigo,
             String denominacion,
-            double precioMinorista,
-            double precioMayorista
+            BigDecimal precioMinorista,
+            BigDecimal precioMayorista
     ) {
     }
 }

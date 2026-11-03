@@ -12,6 +12,13 @@ export const roundMoney = (amount: number) => Math.round(amount * 100) / 100;
 export const formatStatus = (status: string) =>
   status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 
+export const formatArcaResult = (result: string | null) => {
+  const normalized = result?.trim().toUpperCase();
+  if (normalized === "A") return "A: Aprobada con CAE";
+  if (normalized === "R") return "R: Rechazada por ARCA";
+  return result?.trim() || "Sin resultado";
+};
+
 export const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Ocurrió un error";
 
@@ -20,7 +27,8 @@ export const localDateTime = () => {
   return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 };
 
-export function dateTimeParts(value: string): { date: string; time: string } {
+export function dateTimeParts(value: string | null): { date: string; time: string } {
+  if (!value) return { date: "—", time: "" };
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return { date: value, time: "" };
   return {

@@ -7,14 +7,16 @@ import type {
   FacturaOpcionesDTO,
   FacturaRequestDTO,
   FacturaVistaDTO,
+  ArcaConfiguracionDTO,
 } from "./models/factura.dto";
 import { FacturaService } from "./services/FacturaService";
-import { dateTimeParts, errorMessage, localDateTime, money } from "./formatters";
+import { errorMessage, money } from "./formatters";
 import { calculateTotal, detailFromArticle } from "./invoice-utils";
 import { IconButton } from "./IconButton";
 import { Modal } from "./Modal";
 import { ClientExplorerModal } from "./ClientExplorerModal";
 import { PriceArticleExplorerModal } from "./PriceArticleExplorerModal";
+import { InvoiceDetailEditorRow } from "./InvoiceDetailEditorRow";
 
 interface InvoiceFormModalProps {
   mode: "new" | number | null;
@@ -24,8 +26,6 @@ interface InvoiceFormModalProps {
 }
 
 interface HeaderDraft {
-  numero: string;
-  fechaEmision: string;
   puntoVentaId: string;
   clienteId: string;
   listaPrecioId: string;
@@ -35,8 +35,6 @@ interface HeaderDraft {
 }
 
 const emptyHeader: HeaderDraft = {
-  numero: "",
-  fechaEmision: localDateTime(),
   puntoVentaId: "",
   clienteId: "",
   listaPrecioId: "",
@@ -49,6 +47,7 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [options, setOptions] = useState<FacturaOpcionesDTO | null>(null);
+  const [arcaConfiguration, setArcaConfiguration] = useState<ArcaConfiguracionDTO | null>(null);
   const [articles, setArticles] = useState<ArticuloDisponibleDTO[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClienteDisponibleDTO | null>(null);
   const [editing, setEditing] = useState<FacturaVistaDTO | null>(null);
@@ -63,19 +62,22 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
     let active = true;
     setLoading(true);
     setOptions(null);
+    setArcaConfiguration(null);
     setArticles([]);
     setSelectedClient(null);
     setEditing(null);
     setDetails([]);
     setHeaderCollapsed(false);
-    setHeader({ ...emptyHeader, fechaEmision: localDateTime() });
+    setHeader({ ...emptyHeader });
 
     Promise.all([
       service.obtenerOpcionesFactura(),
       mode === "new" ? Promise.resolve(null) : service.obtenerFactura(mode),
-    ]).then(([loadedOptions, invoice]) => {
+      service.obtenerConfiguracionArca(),
+    ]).then(([loadedOptions, invoice, loadedArcaConfiguration]) => {
       if (!active) return;
       setOptions(loadedOptions);
+      setArcaConfiguration(loadedArcaConfiguration);
       setEditing(invoice);
       if (invoice) {
         setSelectedClient(invoice.clienteId == null ? null : {
@@ -108,8 +110,6 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
           }).catch(() => undefined);
         }
         setHeader({
-          numero: String(invoice.numero),
-          fechaEmision: invoice.fechaEmision.slice(0, 16),
           puntoVentaId: String(invoice.puntoVentaId),
           clienteId: invoice.clienteId == null ? "" : String(invoice.clienteId),
           listaPrecioId: String(invoice.listaPrecioId ?? loadedOptions.listaPrecioConsumidorFinal?.id ?? ""),
@@ -133,8 +133,6 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
         );
         setHeader({
           ...emptyHeader,
-          numero: String(loadedOptions.siguienteNumero),
-          fechaEmision: localDateTime(),
           puntoVentaId: loadedOptions.puntosVenta[0] ? String(loadedOptions.puntosVenta[0].id) : "",
           listaPrecioId: String(loadedOptions.listaPrecioConsumidorFinal?.id ?? ""),
           condicionIvaId: consumidorFinal ? String(consumidorFinal.id) : String(loadedOptions.condicionesIva[0]?.id ?? ""),
@@ -153,7 +151,6 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
   }, [mode, onClose, service]);
 
   const total = useMemo(() => calculateTotal(details, articles), [articles, details]);
-  const summaryDate = dateTimeParts(header.fechaEmision);
   const summaryPoint = options?.puntosVenta.find((option) => String(option.id) === header.puntoVentaId)?.descripcion ?? "Sin punto de venta";
   const summaryTaxCondition = options?.condicionesIva.find((option) => String(option.id) === header.condicionIvaId)?.descripcion ?? "Sin condición de IVA";
   const summaryCurrency = options?.tiposMoneda.find((option) => String(option.id) === header.tipoMonedaId)?.descripcion ?? "Sin moneda";
@@ -255,6 +252,7 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (saving) return;
     if (!ready || !options?.usuario) {
       sileo.error({ title: "Faltan datos maestros obligatorios" });
       return;
@@ -264,15 +262,12 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
       return;
     }
     const request: FacturaRequestDTO = {
-      numero: Number(header.numero),
-      fechaEmision: header.fechaEmision,
       puntoVentaId: Number(header.puntoVentaId),
       clienteId: header.clienteId === "" ? null : Number(header.clienteId),
       listaPrecioId: Number(header.listaPrecioId),
       condicionIvaId: Number(header.condicionIvaId),
       tipoMonedaId: Number(header.tipoMonedaId),
       usuarioId: options.usuario.id,
-      estado: editing?.estado ?? "EMITIDA",
       importeCobrado: total,
       observaciones: header.observaciones || null,
       detalles: details,
@@ -284,8 +279,8 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
         ? await service.actualizarFactura(editing.id, request)
         : await service.crearFactura(request);
       sileo.success({
-        title: editing ? "Factura actualizada" : "Factura creada",
-        description: `Comprobante ${saved.numeroFactura}`,
+        title: editing ? "Factura actualizada" : "Factura guardada sin emitir",
+        description: editing ? `Borrador ${saved.id} actualizado` : "Ya podés validarla con ARCA desde Sin emitir",
       });
       onSaved();
     } catch (error) {
@@ -301,11 +296,13 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
       open={mode != null}
       title={mode === "new" ? "Nueva factura" : "Editar factura"}
       className="invoice-form-dialog"
+      closeDisabled={saving}
       onClose={onClose}
     >
       {loading && <p data-empty>Cargando datos de la factura…</p>}
       {!loading && (
-        <form onSubmit={submit}>
+        <form onSubmit={submit} aria-busy={saving}>
+          <fieldset className="form-lock" disabled={saving}>
           {headerCollapsed && details.length > 0 ? (
             <div
               className="invoice-header-readonly"
@@ -322,11 +319,14 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
             >
               <div className="invoice-section-heading">
                 <strong>Datos del comprobante</strong>
-                <span className="invoice-edit-hint"><i className="ph ph-pencil-simple" aria-hidden="true" /> Editar</span>
+                <span className="invoice-heading-actions">
+                  <span className="invoice-type-indicator"><i className="ph ph-receipt" aria-hidden="true" />{arcaConfiguration?.tipoComprobanteDescripcion ?? "Factura C"}</span>
+                  <span className="invoice-edit-hint"><i className="ph ph-pencil-simple" aria-hidden="true" /> Editar</span>
+                </span>
               </div>
               <div className="invoice-form-grid invoice-readonly-grid">
-                <div className="field"><span>Número</span><span className="invoice-text-value">{header.numero}</span></div>
-                <div className="field"><span>Fecha y hora</span><span className="invoice-text-value">{summaryDate.date} {summaryDate.time}</span></div>
+                <div className="field"><span>Número</span><span className="invoice-text-value">Se asigna al emitir</span></div>
+                <div className="field"><span>Fecha y hora</span><span className="invoice-text-value">Se asigna al emitir</span></div>
                 <div className="field"><span>Punto de venta</span><span className="invoice-text-value">{summaryPoint}</span></div>
                 <div className="field"><span>Cliente</span><span className="invoice-text-value">{selectedClient?.denominacion ?? "Consumidor final"}{selectedClient?.cuitCuil && <small>{selectedClient.cuitCuil}</small>}</span></div>
                 <div className="field"><span>Lista de precios</span><span className="invoice-text-value">{summaryPriceList}</span></div>
@@ -340,10 +340,11 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
             <div className="invoice-header-editor">
               <div className="invoice-section-heading">
                 <strong>Datos del comprobante</strong>
+                <span className="invoice-type-indicator"><i className="ph ph-receipt" aria-hidden="true" />{arcaConfiguration?.tipoComprobanteDescripcion ?? "Factura C"}</span>
               </div>
               <fieldset className="invoice-form-grid">
-                <label><span>Número</span><input type="number" min="1" readOnly required value={header.numero} /></label>
-                <label><span>Fecha y hora</span><input type="datetime-local" required value={header.fechaEmision} onChange={(event) => setHeader({ ...header, fechaEmision: event.target.value })} /></label>
+                <div className="field"><span>Número</span><span className="invoice-text-value">Se asigna al emitir</span></div>
+                <div className="field"><span>Fecha y hora</span><span className="invoice-text-value">Se asigna al emitir</span></div>
                 <label><span>Punto de venta</span><select required value={header.puntoVentaId} onChange={(event) => setHeader({ ...header, puntoVentaId: event.target.value })}>{options?.puntosVenta.map((option) => <option key={option.id} value={option.id}>{option.descripcion}</option>)}</select></label>
                 <div className="field">
                   <span>Cliente</span>
@@ -369,28 +370,25 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
           <div className={`details-list${details.length > 0 ? " has-details" : " empty"}`}>
             <div className="table-shell">
             <table className={`details-editor${details.length === 0 ? " empty" : ""}`}>
-              <thead><tr><th>Artículo ID</th><th>Precio lista ID</th><th>Descripción</th><th>Cantidad</th><th>Precio</th><th>Bonif. %</th><th>IVA %</th><th></th></tr></thead>
+              <thead><tr><th>Artículo</th><th>Precio unitario</th><th>Cantidad</th><th>Bonificación</th><th>Neto</th><th>IVA</th><th>Subtotal</th><th><span className="sr-only">Acciones</span></th></tr></thead>
               <tbody>
                 {details.length === 0 && <tr><td colSpan={8} data-empty><div className="details-empty-content"><span>Aún no hay artículos</span><button type="button" className="outlined-button" onClick={openArticleExplorer}><i className="ph ph-plus" aria-hidden="true" /><span>Agregar artículo</span></button></div></td></tr>}
-                {details.map((detail, index) => (
-                  <tr key={`${detail.listaPrecioArticuloId}-${index}`}>
-                    <td><input aria-label="Artículo ID" type="number" min="1" required value={detail.articuloId || ""} onChange={(event) => updateDetail(index, "articuloId", event.target.value)} /></td>
-                    <td><input aria-label="Precio lista ID" type="number" min="1" required value={detail.listaPrecioArticuloId || ""} onChange={(event) => updateDetail(index, "listaPrecioArticuloId", event.target.value)} /></td>
-                    <td><input aria-label="Descripción" value={detail.descripcion ?? ""} onChange={(event) => updateDetail(index, "descripcion", event.target.value)} /></td>
-                    <td><input aria-label="Cantidad" type="number" min="0" step="1" required value={detail.cantidad} onChange={(event) => updateDetail(index, "cantidad", event.target.value)} /></td>
-                    <td><input aria-label="Precio unitario" type="number" min="0" step="0.01" value={detail.precioUnitario ?? ""} onChange={(event) => updateDetail(index, "precioUnitario", event.target.value)} /></td>
-                    <td><input aria-label="Bonificación" type="number" min="0" max="100" step="0.01" value={detail.porcentajeBonificacion ?? 0} onChange={(event) => updateDetail(index, "porcentajeBonificacion", event.target.value)} /></td>
-                    <td><input aria-label="IVA" type="number" min="0" step="0.01" value={detail.porcentajeIva ?? 21} onChange={(event) => updateDetail(index, "porcentajeIva", event.target.value)} /></td>
-                    <td><IconButton type="button" className="detail-delete-button" icon="ph-trash" label="Quitar ítem" onClick={() => removeDetail(index)} /></td>
-                  </tr>
-                ))}
+                {details.map((detail, index) => <InvoiceDetailEditorRow
+                  key={`${detail.listaPrecioArticuloId}-${index}`}
+                  detail={detail}
+                  article={articles.find((article) => article.listaPrecioArticuloId === detail.listaPrecioArticuloId)}
+                  persistedDetail={editing?.detalles.find((item) => item.listaPrecioArticuloId === detail.listaPrecioArticuloId)}
+                  onChange={(field, value) => updateDetail(index, field, value)}
+                  onRemove={() => removeDetail(index)}
+                />)}
               </tbody>
             </table>
             </div>
             {details.length > 0 && <div className="details-add-action"><button type="button" className="outlined-button" onClick={openArticleExplorer}><i className="ph ph-plus" aria-hidden="true" /><span>Agregar artículo</span></button></div>}
           </div>
           <div className="calculated-total"><span>Total calculado</span><output>{money(total)}</output></div>
-          <footer><button type="submit" data-variant="primary" disabled={saving || !ready}><i className="ph ph-check" aria-hidden="true" /><span>{saving ? "Guardando…" : editing ? "Guardar cambios" : "Crear factura"}</span></button></footer>
+          </fieldset>
+          <footer><button type="submit" data-variant="primary" disabled={saving || !ready}><i className="ph ph-check" aria-hidden="true" /><span>{saving ? "Guardando…" : editing ? "Guardar cambios" : "Guardar sin emitir"}</span></button></footer>
         </form>
       )}
     </Modal>

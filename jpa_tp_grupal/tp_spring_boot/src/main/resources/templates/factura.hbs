@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    /* Adaptación para Spring del comprobante storemanager/backend/src/pdf/templates/sale.hbs. */
+    @page { size: A4 portrait; margin: 8mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; color: #111; font-family: Arial, Helvetica, sans-serif; font-size: 9px; }
+    .page { position: relative; width: 100%; height: 273mm; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    .original { height: 6mm; border: 1px solid #111; text-align: center; font-weight: 700; line-height: 5.5mm; }
+    .header-wrap { position: relative; }
+    .invoice-header { table-layout: fixed; border-left: 1px solid #111; border-right: 1px solid #111; border-bottom: 1px solid #111; }
+    .invoice-header > tbody > tr > td { width: 50%; height: 50mm; padding: 3.5mm; vertical-align: top; }
+    .issuer { border-right: 1px solid #111; padding-right: 14mm !important; }
+    .voucher { padding-left: 14mm !important; }
+    .type-box { position: absolute; z-index: 2; top: 0; left: 50%; width: 24mm; height: 24mm; margin-left: -12mm; border: 1px solid #111; background: #fff; text-align: center; }
+    .type-box strong { display: block; padding-top: 1.5mm; font-size: 27px; line-height: 11mm; }
+    .type-box span { display: block; font-size: 7px; line-height: 5mm; }
+    .issuer-grid { table-layout: fixed; }
+    .issuer-grid > tbody > tr > td { height: auto; padding: 0; border: 0; vertical-align: top; }
+    .issuer-grid .logo-cell { width: 29mm; }
+    .issuer-grid .issuer-content { padding-left: 3mm; }
+    .logo-space { width: 100px; height: 100px; border: 1px solid #bbb; text-align: center; overflow: hidden; }
+    .logo-space img { width: 100px; height: 100px; object-fit: contain; }
+    .company-name { margin: 0 0 2.5mm; font-size: 19px; font-weight: 700; line-height: 7mm; }
+    .voucher-title { margin: 0 0 1mm; text-align: left; font-size: 23px; font-weight: 700; letter-spacing: .15mm; }
+    .voucher-number { margin-bottom: 2.5mm; font-size: 12px; font-weight: 700; letter-spacing: .15mm; }
+    .info-table td { height: auto; padding: .9mm 0; border: 0; vertical-align: top; }
+    .info-table .label { width: 42%; padding-right: 2mm; text-align: left; font-weight: 700; }
+    .issuer .info-table .label { width: 43%; }
+    .client { margin-top: 3mm; border: 1px solid #111; table-layout: fixed; }
+    .client td { height: 6mm; padding: 1mm 1.5mm; border: 0; vertical-align: middle; }
+    .client .label { font-weight: 700; }
+    .items { margin-top: 0; table-layout: fixed; }
+    .items th { height: 8mm; padding: 1mm; border: 1px solid #777; background: #d4d4d4; font-size: 8px; font-weight: 400; text-align: center; }
+    .items td { height: 7mm; padding: 1mm 1.5mm; border: 0; text-align: right; vertical-align: middle; }
+    .items td.description { text-align: left; }
+    .items td.code { text-align: center; }
+    .items tbody tr:nth-child(n+2) td { padding-top: .5mm; padding-bottom: .5mm; }
+    .summary { position: absolute; right: 0; bottom: 26mm; width: 100%; height: 36mm; border: 1px solid #111; table-layout: fixed; }
+    .summary > tbody > tr > td { padding: 4mm; border: 0; vertical-align: top; }
+    .transparency { width: 58%; border-right: 1px solid #ccc !important; }
+    .transparency-title { margin-bottom: 2.5mm; font-size: 8px; font-weight: 700; }
+    .transparency-row { margin-top: 1.5mm; }
+    .transparency-row strong { display: inline-block; width: 48mm; }
+    .totals-cell { width: 42%; }
+    .currency-meta { margin-bottom: 2mm; padding-bottom: 2mm; border-bottom: 1px solid #ddd; color: #333; font-size: 8px; }
+    .totals td { padding: 1.4mm 0; border: 0; text-align: right; }
+    .totals .label { width: 70%; font-weight: 700; }
+    .totals .currency { width: 8%; font-weight: 700; }
+    .totals .amount { width: 22%; }
+    .authorization { position: absolute; left: 0; right: 0; bottom: 0; height: 23mm; border: 1px solid #bbb; table-layout: fixed; }
+    .authorization td { padding: 1.5mm; border: 0; vertical-align: top; }
+    .qr-cell { width: 24mm; text-align: center; }
+    .qr { width: 19mm; height: 19mm; }
+    .arca-logo { display: block; width: 21mm; height: auto; margin-bottom: 1mm; }
+    .authorization-copy { width: 48%; font-size: 7px; font-style: italic; text-align: left; }
+    .authorization-copy strong { display: block; margin-bottom: 1mm; font-size: 9px; text-align: left; }
+    .page-count { width: 10%; text-align: center; font-weight: 700; }
+    .cae { width: 25%; text-align: right; font-size: 8px; }
+    .cae div { margin-bottom: 2mm; }
+    .draft { padding-top: 6mm; text-align: center; font-size: 10px; font-weight: 700; }
+    .test-note { display: block; margin-top: 1mm; font-size: 7px; font-weight: 400; }
+  </style>
+</head>
+<body>
+<div class="page">
+  <div class="original">ORIGINAL</div>
+  <div class="header-wrap">
+    <table class="invoice-header">
+      <tr>
+        <td class="issuer">
+          <table class="issuer-grid">
+            <tr>
+              <td class="logo-cell"><div class="logo-space">{{#if hasLogo}}<img src="{{{logoDataUri}}}" alt="Logo" />{{/if}}</div></td>
+              <td class="issuer-content">
+                <div class="company-name">{{issuer.tradeName}}</div>
+                <table class="info-table">
+                  <tr><td class="label">Razón social</td><td>{{issuer.legalName}}</td></tr>
+                  <tr><td class="label">Domicilio comercial</td><td>{{issuer.address}}</td></tr>
+                  <tr><td class="label">Condición frente al IVA</td><td>{{issuer.ivaCondition}}</td></tr>
+                  <tr><td class="label">Teléfono</td><td>{{issuer.phone}}</td></tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td class="voucher">
+          <div class="voucher-title">FACTURA</div>
+          <div class="voucher-number">N° {{voucher.fullNumber}}</div>
+          <table class="info-table">
+            <tr><td class="label">Fecha de emisión</td><td>{{voucher.date}}</td></tr>
+            <tr><td class="label">CUIT</td><td>{{issuer.cuit}}</td></tr>
+            <tr><td class="label">Ingresos Brutos</td><td>{{issuer.grossIncome}}</td></tr>
+            <tr><td class="label">Inicio de actividades</td><td>{{issuer.activityStart}}</td></tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    <div class="type-box"><strong>{{voucher.letter}}</strong><span>Código N° {{voucher.code}}</span></div>
+  </div>
+
+  <table class="client">
+    <tr>
+      <td style="width:14%" class="label">CUIT/CUIL/DNI</td><td style="width:20%">{{receiver.document}}</td>
+      <td style="width:27%" class="label">Apellido y nombre / Razón social</td><td style="width:39%">{{receiver.name}}</td>
+    </tr>
+    <tr>
+      <td class="label">Condición frente al IVA</td><td><strong>{{receiver.ivaCondition}}</strong></td>
+      <td class="label">Teléfono</td><td>{{receiver.phone}}</td>
+    </tr>
+    <tr>
+      <td class="label">Condición de venta</td><td>{{receiver.saleCondition}}</td>
+      <td class="label">Domicilio comercial</td><td>{{receiver.address}}</td>
+    </tr>
+  </table>
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:9%">Código</th>
+        <th style="width:25%">Producto/Servicio</th>
+        <th style="width:10%">Cantidad</th>
+        <th style="width:10%">U. de medida</th>
+        <th style="width:12%">Precio Unit.</th>
+        <th style="width:9%">% Bonif.</th>
+        <th style="width:11%">Imp. Bonif.</th>
+        <th style="width:14%">Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each items}}
+      <tr>
+        <td class="code">{{code}}</td><td class="description">{{description}}</td><td>{{quantity}}</td>
+        <td>{{unit}}</td><td>$ {{unitPrice}}</td><td>{{discountPercent}}</td><td>$ {{discountAmount}}</td><td>$ {{subtotal}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  <table class="summary">
+    <tr>
+      <td class="transparency">
+        <div class="transparency-title">Régimen de Transparencia Fiscal al Consumidor (Ley 27.743)</div>
+        <div class="transparency-row"><strong>IVA contenido</strong>$ {{fiscalTransparency.vatIncluded}}</div>
+        <div class="transparency-row"><strong>Otros Impuestos Nacionales Indirectos</strong>$ {{fiscalTransparency.otherNationalTaxes}}</div>
+      </td>
+      <td class="totals-cell">
+        <div class="currency-meta">Moneda: {{currency.code}} &#160;&#160; Cotización: {{currency.exchangeRate}}</div>
+        <table class="totals">
+          <tr><td class="label">Subtotal</td><td class="currency">$</td><td class="amount">{{totals.subtotal}}</td></tr>
+          <tr><td class="label">Otros tributos</td><td class="currency">$</td><td class="amount">{{totals.otherTaxes}}</td></tr>
+          <tr><td class="label">Importe total</td><td class="currency">$</td><td class="amount"><strong>{{totals.total}}</strong></td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <table class="authorization">
+    <tr>
+      <td class="qr-cell">{{#if authorized}}<img class="qr" src="{{{qrDataUri}}}" alt="QR ARCA" />{{/if}}</td>
+      <td class="authorization-copy">
+        {{#if authorized}}{{#if hasArcaLogo}}<img class="arca-logo" src="{{{arcaLogoDataUri}}}" alt="ARCA" />{{/if}}<strong>Comprobante Autorizado</strong>Esta Administración Federal no se responsabiliza por los datos ingresados en el detalle de la operación.{{else}}<div class="draft">DOCUMENTO NO VÁLIDO COMO FACTURA<span class="test-note">Pendiente de autorización y asignación de CAE.</span></div>{{/if}}
+      </td>
+      <td class="page-count">Pág. 1/1</td>
+      <td class="cae">{{#if authorized}}<div><strong>CAE N°:</strong> {{cae}}</div><div><strong>Fecha de Vto. de CAE:</strong> {{caeExpiration}}</div>{{/if}}</td>
+    </tr>
+  </table>
+</div>
+</body>
+</html>

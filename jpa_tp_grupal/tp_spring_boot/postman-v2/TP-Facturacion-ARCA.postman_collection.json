@@ -1,0 +1,89 @@
+{
+  "info": {
+    "_postman_id": "7abde00d-a3ee-4e2c-926a-d036ecce5a73",
+    "name": "TP Facturación + ARCA Homologación",
+    "description": "API completa de facturación. Los secretos ARCA permanecen únicamente en el proceso Spring Boot.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "ARCA",
+      "item": [
+        { "name": "Configuración", "event": [{"listen":"test","script":{"exec":["pm.test('Configuración lista para probar', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().listaParaProbar).to.eql(true); });"]}}], "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas/arca/configuracion" } },
+        { "name": "Probar autenticación WSAA", "event": [{"listen":"test","script":{"exec":["pm.test('WSAA autenticó la aplicación', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().autenticada).to.eql(true); });"]}}], "request": { "method": "POST", "url": "{{baseUrl}}/api/facturas/arca/probar-autenticacion", "description": "Firma el TRA y obtiene un ticket WSAA sin exponer token ni sign." } }
+      ]
+    },
+    {
+      "name": "Facturas",
+      "item": [
+        { "name": "Listar", "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas" } },
+        { "name": "Filtrar", "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas?fechaDesde=2026-01-01&fechaHasta=2026-12-31&estado=EMITIDA&montoMinimo=0" } },
+        {
+          "name": "Crear borrador",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));", "const json = pm.response.json();", "pm.environment.set('facturaId', json.id);"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": null,\n  \"listaPrecioId\": {{listaPrecioId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"importeCobrado\": 0,\n  \"observaciones\": \"Borrador creado desde Postman\",\n  \"detalles\": [\n    {\n      \"articuloId\": {{articuloId}},\n      \"listaPrecioArticuloId\": {{listaPrecioArticuloId}},\n      \"descripcion\": \"Prueba Postman\",\n      \"cantidad\": 1,\n      \"precioUnitario\": null,\n      \"porcentajeBonificacion\": 0,\n      \"porcentajeIva\": 21\n    }\n  ]\n}" },
+            "url": "{{baseUrl}}/api/facturas"
+          }
+        },
+        { "name": "Obtener por ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas/{{facturaId}}" } },
+        {
+          "name": "Editar borrador",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"puntoVentaId\": {{puntoVentaId}},\n  \"clienteId\": null,\n  \"listaPrecioId\": {{listaPrecioId}},\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"tipoMonedaId\": {{tipoMonedaId}},\n  \"usuarioId\": {{usuarioId}},\n  \"importeCobrado\": 0,\n  \"observaciones\": \"Borrador editado\",\n  \"detalles\": [{\"articuloId\": {{articuloId}}, \"listaPrecioArticuloId\": {{listaPrecioArticuloId}}, \"descripcion\": \"Prueba editada\", \"cantidad\": 2, \"precioUnitario\": null, \"porcentajeBonificacion\": 0, \"porcentajeIva\": 21}]\n}" },
+            "url": "{{baseUrl}}/api/facturas/{{facturaId}}"
+          }
+        },
+        { "name": "Emitir con ARCA", "event": [{"listen":"test","script":{"exec":["pm.test('ARCA respondió', () => pm.response.to.have.status(200));","const json = pm.response.json();","if (json.emitida) { pm.test('CAE asignado', () => pm.expect(json.cae).to.be.a('string').and.not.empty); }"]}}], "request": { "method": "POST", "url": "{{baseUrl}}/api/facturas/{{facturaId}}/emitir" } },
+        { "name": "Anular emitida (estado local)", "request": { "method": "POST", "url": "{{baseUrl}}/api/facturas/{{facturaId}}/anular", "description": "No revierte el comprobante fiscal en ARCA; una reversión fiscal requiere nota de crédito." } },
+        { "name": "Eliminar borrador", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/facturas/{{facturaId}}" } },
+        { "name": "PDF de comprobante", "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas/{{facturaId}}/pdf" } },
+        { "name": "Totales emitidos por moneda", "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas/totales-por-moneda" } },
+        { "name": "Reporte PDF", "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas/reporte/pdf?estado=EMITIDA" } },
+        { "name": "Reporte Excel", "request": { "method": "GET", "url": "{{baseUrl}}/api/facturas/reporte/excel?estado=EMITIDA" } }
+      ]
+    },
+    {
+      "name": "Datos maestros - Consultas",
+      "item": [
+        { "name": "Buscar artículos", "request": { "method": "GET", "url": "{{baseUrl}}/api/datos-maestros/precios-articulo?busqueda=&pagina=0&tamanio=8&listaPrecioId={{listaPrecioId}}" } },
+        { "name": "Buscar clientes", "request": { "method": "GET", "url": "{{baseUrl}}/api/datos-maestros/clientes-disponibles?busqueda=&pagina=0&tamanio=8&orden=ULTIMOS_AGREGADOS" } },
+        { "name": "Opciones de factura", "request": { "method": "GET", "url": "{{baseUrl}}/api/datos-maestros/opciones-factura" } },
+        { "name": "Información del sistema", "request": { "method": "GET", "url": "{{baseUrl}}/api/datos-maestros/info-sistema" } },
+        { "name": "Opciones de artículo", "request": { "method": "GET", "url": "{{baseUrl}}/api/datos-maestros/articulos/opciones" } },
+        { "name": "Buscar rubros", "request": { "method": "GET", "url": "{{baseUrl}}/api/datos-maestros/rubros?busqueda=&pagina=0&tamanio=10" } },
+        { "name": "Buscar marcas", "request": { "method": "GET", "url": "{{baseUrl}}/api/datos-maestros/marcas?busqueda=&pagina=0&tamanio=10" } },
+        { "name": "Obtener artículo", "request": { "method": "GET", "url": "{{baseUrl}}/api/datos-maestros/articulos/{{articuloId}}" } }
+      ]
+    },
+    {
+      "name": "Datos maestros - Escritura",
+      "item": [
+        { "name": "Crear usuario", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"usuario\":\"postman\",\"clave\":\"prueba\",\"nombre\":\"Usuario\",\"apellido\":\"Postman\"}"}, "url": "{{baseUrl}}/api/datos-maestros/usuarios" } },
+        { "name": "Crear condición IVA", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"codigoAfip\":5,\"denominacion\":\"Consumidor Final\",\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/condiciones-iva" } },
+        { "name": "Crear moneda", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"codigoAfip\":\"PES\",\"denominacion\":\"Peso Argentino\",\"simbolo\":\"$\",\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/tipos-moneda" } },
+        { "name": "Crear punto de venta", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"numero\":1,\"descripcion\":\"Sucursal Postman\",\"tipoEmision\":\"ELECTRONICA\",\"domicilioComercial\":\"Domicilio de prueba\",\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/puntos-venta" } },
+        { "name": "Crear cliente", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"cuitCuil\":\"20-12345678-6\",\"denominacion\":\"Cliente Postman\",\"email\":\"postman@example.com\",\"telefono\":\"11111111\",\"celular\":null,\"nombreCalle\":\"Calle de prueba\",\"numeroCalle\":\"123\",\"condicionIvaId\":{{condicionIvaId}},\"listaPrecioId\":{{listaPrecioId}},\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/clientes" } },
+        { "name": "Editar cliente", "request": { "method": "PUT", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"cuitCuil\":\"20-12345678-6\",\"denominacion\":\"Cliente Postman editado\",\"email\":\"postman@example.com\",\"telefono\":null,\"celular\":null,\"nombreCalle\":null,\"numeroCalle\":null,\"condicionIvaId\":{{condicionIvaId}},\"listaPrecioId\":{{listaPrecioId}},\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/clientes/{{clienteId}}" } },
+        { "name": "Asignar lista a cliente", "request": { "method": "PUT", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"listaPrecioId\":{{listaPrecioId}},\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/clientes/{{clienteId}}/lista-precio" } },
+        { "name": "Desactivar cliente", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/datos-maestros/clientes/{{clienteId}}?usuarioId={{usuarioId}}" } },
+        { "name": "Crear rubro", "event": [{"listen":"test","script":{"exec":["pm.test('201 Created', () => pm.response.to.have.status(201));","pm.environment.set('rubroId', pm.response.json().id);"]}}], "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"denominacion\":\"Rubro Postman\",\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/rubros" } },
+        { "name": "Editar rubro", "request": { "method": "PUT", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"denominacion\":\"Rubro Postman editado\",\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/rubros/{{rubroId}}" } },
+        { "name": "Desactivar rubro", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/datos-maestros/rubros/{{rubroId}}?usuarioId={{usuarioId}}" } },
+        { "name": "Crear marca", "event": [{"listen":"test","script":{"exec":["pm.test('201 Created', () => pm.response.to.have.status(201));","pm.environment.set('marcaId', pm.response.json().id);"]}}], "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"denominacion\":\"Marca Postman\",\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/marcas" } },
+        { "name": "Editar marca", "request": { "method": "PUT", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"denominacion\":\"Marca Postman editada\",\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/marcas/{{marcaId}}" } },
+        { "name": "Desactivar marca", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/datos-maestros/marcas/{{marcaId}}?usuarioId={{usuarioId}}" } },
+        { "name": "Crear lista de precio", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"codigo\":\"POSTMAN\",\"denominacion\":\"Lista Postman\",\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/listas-precio" } },
+        { "name": "Crear artículo básico", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"codigo\":\"ART-POSTMAN\",\"denominacion\":\"Artículo Postman\",\"rubroId\":1,\"marcaId\":1,\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/articulos" } },
+        { "name": "Crear artículo con precios", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"codigo\":null,\"denominacion\":\"Artículo con precios Postman\",\"rubroId\":1,\"marcaId\":1,\"usuarioId\":{{usuarioId}},\"precios\":[{\"listaPrecioId\":{{listaPrecioId}},\"precioVenta\":12500.50}]}"}, "url": "{{baseUrl}}/api/datos-maestros/articulos-con-precios" } },
+        { "name": "Editar artículo", "request": { "method": "PUT", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"codigo\":null,\"denominacion\":\"Artículo editado Postman\",\"rubroId\":1,\"marcaId\":1,\"usuarioId\":{{usuarioId}},\"precios\":[{\"listaPrecioId\":{{listaPrecioId}},\"precioVenta\":13000.00}]}"}, "url": "{{baseUrl}}/api/datos-maestros/articulos/{{articuloId}}" } },
+        { "name": "Desactivar artículo", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/datos-maestros/articulos/{{articuloId}}?usuarioId={{usuarioId}}" } },
+        { "name": "Crear precio de artículo", "request": { "method": "POST", "header": [{"key":"Content-Type","value":"application/json"}], "body": {"mode":"raw","raw":"{\"listaPrecioId\":{{listaPrecioId}},\"articuloId\":{{articuloId}},\"precioVenta\":10000.00,\"usuarioId\":{{usuarioId}}}"}, "url": "{{baseUrl}}/api/datos-maestros/precios-articulo" } }
+      ]
+    }
+  ]
+}

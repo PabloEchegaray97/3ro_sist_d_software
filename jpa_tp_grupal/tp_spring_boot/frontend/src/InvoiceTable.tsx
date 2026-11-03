@@ -23,7 +23,7 @@ export function InvoiceTable({ invoices, loading, onAction }: InvoiceTableProps)
 
   const openAt = (invoice: FacturaReporteDTO, x: number, y: number) => {
     const menuWidth = 190;
-    const menuHeight = invoice.estado.trim().toUpperCase() === "ANULADA" ? 138 : 184;
+    const menuHeight = invoice.estado.trim().toUpperCase() === "SIN_EMITIR" ? 184 : 108;
     setMenu({
       invoice,
       x: Math.max(8, Math.min(x, window.innerWidth - menuWidth - 8)),
@@ -58,28 +58,36 @@ export function InvoiceTable({ invoices, loading, onAction }: InvoiceTableProps)
             <tr><td colSpan={10} data-empty>No hay facturas para los filtros seleccionados.</td></tr>
           )}
           {!loading && invoices.map((invoice) => {
-            const annulled = invoice.estado.trim().toUpperCase() === "ANULADA";
+            const status = invoice.estado.trim().toUpperCase();
             const date = dateTimeParts(invoice.fechaEmision);
             return (
               <tr
                 key={invoice.id}
+                tabIndex={0}
+                onClick={() => onAction("view", invoice)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onAction("view", invoice);
+                  }
+                }}
                 onContextMenu={(event) => openFromRow(event, invoice)}
-                aria-label={`Factura ${invoice.numeroFactura}. Clic secundario para abrir acciones.`}
+                aria-label={`Ver factura ${invoice.numeroFactura ?? `borrador ${invoice.id}`}. Clic secundario para abrir acciones.`}
               >
                 <td>{invoice.id}</td>
-                <td>{invoice.numeroFactura}</td>
+                <td>{invoice.numeroFactura ?? "—"}</td>
                 <td><span className="date-time"><span>{date.date}</span><small>{date.time}</small></span></td>
                 <td>{invoice.clienteDenominacion}</td>
                 <td>{invoice.condicionIva}</td>
                 <td>{invoice.puntoVentaDescripcion}</td>
                 <td data-money>{money(invoice.importeTotal)}</td>
                 <td>{invoice.cantidadItems}</td>
-                <td data-status={annulled ? "anulada" : "emitida"}>{formatStatus(invoice.estado)}</td>
+                <td data-status={status === "SIN_EMITIR" ? "pendiente" : "emitida"}>{formatStatus(invoice.estado).replace("_", " ")}</td>
                 <td className="row-menu-column">
                   <IconButton
                     type="button"
                     icon="ph-dots-three-vertical"
-                    label={`Acciones de la factura ${invoice.numeroFactura}`}
+                    label={`Acciones de la factura ${invoice.numeroFactura ?? `borrador ${invoice.id}`}`}
                     aria-haspopup="menu"
                     aria-expanded={menu?.invoice.id === invoice.id}
                     onClick={(event) => openFromButton(event, invoice)}

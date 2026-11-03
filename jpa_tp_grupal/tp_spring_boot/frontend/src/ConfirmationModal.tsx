@@ -19,8 +19,8 @@ export function ConfirmationModal({ pending, busy, onConfirm, onClose }: Confirm
     >
       <p className="confirmation-text">
         {deleting
-          ? `La factura ${pending.invoice.numeroFactura} y sus detalles se eliminarán definitivamente.`
-          : `La factura ${pending.invoice.numeroFactura} quedará anulada.`}
+          ? `El borrador ${pending.invoice.numeroFactura ?? pending.invoice.id} y sus detalles se eliminarán definitivamente.`
+          : `La factura ${pending.invoice.numeroFactura ?? pending.invoice.id} quedará anulada en el sistema.`}
       </p>
       <footer className="dialog-actions">
         <button type="button" disabled={busy} onClick={onClose}>Cancelar</button>

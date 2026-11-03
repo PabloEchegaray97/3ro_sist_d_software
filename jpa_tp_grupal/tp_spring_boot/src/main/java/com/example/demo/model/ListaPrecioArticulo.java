@@ -13,6 +13,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(
         name = "lista_precio_articulo",
@@ -33,8 +35,8 @@ public class ListaPrecioArticulo extends AuditoriaApp {
     @EqualsAndHashCode.Exclude
     private ListaPrecio listaPrecio;
 
-    @Column(nullable = false)
-    private double precioVenta;
+    @Column(precision = 19, scale = 2, nullable = false)
+    private BigDecimal precioVenta;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "articulo_id", nullable = false)

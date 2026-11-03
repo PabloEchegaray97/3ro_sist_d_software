@@ -5,6 +5,8 @@ import com.example.demo.model.EntityId;
 import com.example.demo.model.FacturaVenta;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.LockModeType;
+import com.example.demo.model.PuntoVenta;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -33,7 +35,24 @@ public class FacturaEscrituraRepository {
         return factura;
     }
 
+    public FacturaVenta buscarFacturaParaActualizar(Long id) {
+        FacturaVenta factura = entityManager.find(FacturaVenta.class, id, LockModeType.PESSIMISTIC_WRITE);
+        if (factura == null) {
+            throw new RecursoNoEncontradoException("Factura no encontrada: " + id);
+        }
+        return factura;
+    }
+
+    public PuntoVenta bloquearPuntoVenta(Long id) {
+        PuntoVenta puntoVenta = entityManager.find(PuntoVenta.class, id, LockModeType.PESSIMISTIC_WRITE);
+        if (puntoVenta == null) {
+            throw new RecursoNoEncontradoException("Punto de venta no encontrado: " + id);
+        }
+        return puntoVenta;
+    }
+
     public boolean existeNumero(Long numero) {
+        if (numero == null) return false;
         Long cantidad = entityManager.createQuery(
                 "SELECT COUNT(f) FROM FacturaVenta f WHERE f.numero = :numero",
                 Long.class
@@ -42,6 +61,7 @@ public class FacturaEscrituraRepository {
     }
 
     public boolean existeNumeroEnOtraFactura(Long numero, Long facturaId) {
+        if (numero == null) return false;
         Long cantidad = entityManager.createQuery(
                 "SELECT COUNT(f) FROM FacturaVenta f " +
                 "WHERE f.numero = :numero AND f.id <> :facturaId",

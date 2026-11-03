@@ -12,6 +12,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "factura_venta_detalle")
 @Getter
@@ -33,17 +35,21 @@ public class FacturaVentaDetalle extends EntityId {
 
     private String descripcion;
 
-    @Column(nullable = false)
-    private double cantidad;
+    @Column(precision = 19, scale = 4, nullable = false)
+    private BigDecimal cantidad;
 
-    @Column(nullable = false)
-    private double precioUnitario;
+    @Column(precision = 19, scale = 2, nullable = false)
+    private BigDecimal precioUnitario;
 
-    private double porcentajeBonificacion;
-    private double porcentajeIva;
-    private double importeNeto;
-    private double importeIva;
+    @Column(precision = 7, scale = 4, nullable = false)
+    private BigDecimal porcentajeBonificacion;
+    @Column(precision = 7, scale = 4, nullable = false)
+    private BigDecimal porcentajeIva;
+    @Column(precision = 19, scale = 2, nullable = false)
+    private BigDecimal importeNeto;
+    @Column(precision = 19, scale = 2, nullable = false)
+    private BigDecimal importeIva;
 
-    @Column(nullable = false)
-    private double importeSubtotal;
+    @Column(precision = 19, scale = 2, nullable = false)
+    private BigDecimal importeSubtotal;
 }

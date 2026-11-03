@@ -4,8 +4,13 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
-import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 
 // CONSIGNA ESCRITURA - 1.a y 1.b: Request DTO para POST y PUT.
@@ -16,16 +21,22 @@ import java.util.List;
 @AllArgsConstructor
 public class FacturaRequestDTO {
 
-    private Long numero;
-    private LocalDateTime fechaEmision;
+    @NotNull
     private Long puntoVentaId;
     private Long clienteId;
+    @NotNull
     private Long listaPrecioId;
+    @NotNull
     private Long condicionIvaId;
+    @NotNull
     private Long tipoMonedaId;
+    @NotNull
     private Long usuarioId;
-    private String estado;
-    private Double importeCobrado;
+    @DecimalMin(value = "0.00", inclusive = true)
+    private BigDecimal importeCobrado;
+    @Size(max = 1000)
     private String observaciones;
+    @NotEmpty
+    @Valid
     private List<FacturaDetalleRequestDTO> detalles;
 }

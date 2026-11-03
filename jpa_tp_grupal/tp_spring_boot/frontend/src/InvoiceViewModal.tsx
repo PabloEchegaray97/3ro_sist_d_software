@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { sileo } from "sileo";
 import type { FacturaVistaDTO } from "./models/factura.dto";
 import { FacturaService } from "./services/FacturaService";
-import { dateTimeParts, decimal, errorMessage, formatStatus, money } from "./formatters";
+import { dateTimeParts, decimal, errorMessage, formatArcaResult, formatStatus, money } from "./formatters";
 import { Modal } from "./Modal";
 
 interface InvoiceViewModalProps {
@@ -33,7 +33,7 @@ export function InvoiceViewModal({ invoiceId, service, onClose }: InvoiceViewMod
   return (
     <Modal
       open={invoiceId != null}
-      title={invoice ? `Factura ${invoice.numero}` : "Detalle de factura"}
+      title={invoice ? (invoice.numero == null ? `Borrador ${invoice.id}` : `Factura ${invoice.numero}`) : "Detalle de factura"}
       description="Información registrada del comprobante."
       className="wide-dialog"
       onClose={onClose}
@@ -42,7 +42,7 @@ export function InvoiceViewModal({ invoiceId, service, onClose }: InvoiceViewMod
       {invoice && (
         <div className="invoice-view">
           <dl className="invoice-summary">
-            <div><dt>Número</dt><dd>{invoice.numero}</dd></div>
+            <div><dt>Número</dt><dd>{invoice.numero ?? "Se asigna al emitir"}</dd></div>
             <div><dt>Fecha</dt><dd>{date?.date} {date?.time}</dd></div>
             <div><dt>Estado</dt><dd data-status={invoice.estado.toUpperCase() === "ANULADA" ? "anulada" : "emitida"}>{formatStatus(invoice.estado)}</dd></div>
             <div><dt>Punto de venta</dt><dd>{invoice.puntoVentaDescripcion} · ID {invoice.puntoVentaId}</dd></div>
@@ -54,6 +54,16 @@ export function InvoiceViewModal({ invoiceId, service, onClose }: InvoiceViewMod
             {invoice.fechaAnulacion && <div><dt>Fecha de anulación</dt><dd>{invoice.fechaAnulacion}</dd></div>}
           </dl>
           <div className="invoice-notes"><span>Observaciones</span><p>{invoice.observaciones || "Sin observaciones"}</p></div>
+          {invoice.cae && (
+            <dl className="invoice-arca-summary">
+              <div><dt>CAE</dt><dd>{invoice.cae}</dd></div>
+              <div><dt>Vencimiento CAE</dt><dd>{invoice.caeFechaVencimiento ?? "—"}</dd></div>
+              <div><dt>Resultado ARCA</dt><dd>{formatArcaResult(invoice.resultadoAfip)}</dd></div>
+            </dl>
+          )}
+          {!invoice.cae && invoice.motivoRechazo && (
+            <div className="invoice-arca-error"><span>Último resultado de ARCA</span><p>{invoice.motivoRechazo}</p></div>
+          )}
           <div className="table-shell">
             <table className="invoice-details">
               <thead><tr><th>Artículo</th><th>Lista</th><th>Descripción</th><th>Cantidad</th><th>Precio</th><th>Bonif.</th><th>IVA</th><th>Neto</th><th>IVA importe</th><th>Subtotal</th></tr></thead>
@@ -74,6 +84,19 @@ export function InvoiceViewModal({ invoiceId, service, onClose }: InvoiceViewMod
             <div><dt>Cobrado</dt><dd>{money(invoice.importeCobrado)}</dd></div>
             <div><dt>Saldo</dt><dd>{money(invoice.importeSaldo)}</dd></div>
           </dl>
+          {invoice.cae && <footer className="invoice-print-actions">
+            <button
+              type="button"
+              className="outlined-button"
+              onClick={() => {
+                if (!service.abrirFacturaPdf(invoice.id)) {
+                  sileo.warning({ title: "El navegador bloqueó la ventana del PDF" });
+                }
+              }}
+            >
+              <i className="ph ph-printer" aria-hidden="true" /><span>Imprimir</span>
+            </button>
+          </footer>}
         </div>
       )}
     </Modal>

@@ -1,6 +1,7 @@
 package com.example.demo.repository;
 
 import com.example.demo.dto.FacturaReporteDTO;
+import com.example.demo.dto.TotalMonedaDTO;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
@@ -11,6 +12,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.math.BigDecimal;
+import com.example.demo.model.EstadoFactura;
 
 @Repository
 public class FacturaReporteRepository {
@@ -22,7 +25,7 @@ public class FacturaReporteRepository {
             Date fechaDesde,
             Date fechaHasta,
             String estado,
-            Double montoMinimo
+            BigDecimal montoMinimo
     ) {
         // CONSIGNA - PARTE 2.3: SELECT new proyecta directamente desde JPQL
         // hacia FacturaReporteDTO, sin cargar entidades completas en memoria.
@@ -60,8 +63,12 @@ public class FacturaReporteRepository {
             parametros.put("fechaHasta", fechaHasta);
         }
         if (estado != null && !estado.isBlank()) {
-            jpql.append("AND UPPER(f.estado) = UPPER(:estado) ");
-            parametros.put("estado", estado.trim());
+            jpql.append("AND f.estado = :estado ");
+            try {
+                parametros.put("estado", EstadoFactura.valueOf(estado.trim().toUpperCase()));
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalArgumentException("estado debe ser SIN_EMITIR, EMITIDA o ANULADA");
+            }
         }
         if (montoMinimo != null) {
             jpql.append("AND f.importeTotal >= :montoMinimo ");
@@ -82,6 +89,17 @@ public class FacturaReporteRepository {
         );
         parametros.forEach(query::setParameter);
         return query.getResultList();
+    }
+
+    public List<TotalMonedaDTO> totalesEmitidosPorMoneda() {
+        return entityManager.createQuery(
+                "SELECT new com.example.demo.dto.TotalMonedaDTO(" +
+                " m.codigoAfip, m.denominacion, SUM(f.importeTotal)) " +
+                "FROM FacturaVenta f JOIN f.tipoMoneda m " +
+                "WHERE f.estado = com.example.demo.model.EstadoFactura.EMITIDA " +
+                "GROUP BY m.codigoAfip, m.denominacion ORDER BY m.codigoAfip",
+                TotalMonedaDTO.class
+        ).getResultList();
     }
 
     // CONSIGNA ESCRITURA - 3.1: construye el DTO de respuesta despues de POST o PUT.

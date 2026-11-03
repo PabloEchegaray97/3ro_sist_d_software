@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import java.math.BigDecimal;
 
 @Getter
 @Setter
@@ -18,11 +19,11 @@ public class FacturaDetalleVistaDTO {
     private Long listaPrecioArticuloId;
     private String listaPrecio;
     private String descripcion;
-    private double cantidad;
-    private double precioUnitario;
-    private double porcentajeBonificacion;
-    private double porcentajeIva;
-    private double importeNeto;
-    private double importeIva;
-    private double importeSubtotal;
+    private BigDecimal cantidad;
+    private BigDecimal precioUnitario;
+    private BigDecimal porcentajeBonificacion;
+    private BigDecimal porcentajeIva;
+    private BigDecimal importeNeto;
+    private BigDecimal importeIva;
+    private BigDecimal importeSubtotal;
 }

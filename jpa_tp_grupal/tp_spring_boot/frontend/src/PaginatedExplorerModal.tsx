@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { sileo } from "sileo";
 import type { PaginaDTO } from "./models/factura.dto";
 import { errorMessage } from "./formatters";
@@ -61,23 +61,27 @@ export function PaginatedExplorerModal<T,>({
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
+  const requestVersion = useRef(0);
 
   const requestPage = async (search: string, requestedPage: number) => {
+    const version = ++requestVersion.current;
     setLoading(true);
     try {
       const result = await loadPage(search, requestedPage, pageSize);
+      if (version !== requestVersion.current) return;
       setItems(result.contenido);
       setAppliedSearch(search);
       setPage(result.pagina);
       setTotalItems(result.totalElementos);
       setTotalPages(result.totalPaginas);
     } catch (error) {
+      if (version !== requestVersion.current) return;
       setItems([]);
       setTotalItems(0);
       setTotalPages(0);
       sileo.error({ title: `No se pudo realizar la búsqueda`, description: errorMessage(error) });
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   };
 

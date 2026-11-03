@@ -1,5 +1,5 @@
 :root {
-  --primary-brand: #0077ff;
+  --primary-brand: #242c4f;
   --primary: var(--primary-brand);
   --primary-hover: color-mix(in srgb, var(--primary-brand) 88%, black);
   --primary-foreground: #ffffff;

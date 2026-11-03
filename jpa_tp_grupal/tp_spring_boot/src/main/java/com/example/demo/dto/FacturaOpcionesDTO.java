@@ -3,7 +3,6 @@ package com.example.demo.dto;
 import java.util.List;
 
 public record FacturaOpcionesDTO(
-        Long siguienteNumero,
         List<OpcionDTO> puntosVenta,
         List<ClienteOpcionDTO> clientes,
         List<OpcionDTO> condicionesIva,

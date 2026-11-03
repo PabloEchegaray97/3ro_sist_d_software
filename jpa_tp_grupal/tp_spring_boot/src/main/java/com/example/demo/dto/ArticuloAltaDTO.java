@@ -1,6 +1,12 @@
 package com.example.demo.dto;
 
 import java.util.List;
+import java.math.BigDecimal;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 
 public final class ArticuloAltaDTO {
 
@@ -23,14 +29,17 @@ public final class ArticuloAltaDTO {
 
     public record CrearRequest(
             String codigo,
-            String denominacion,
-            Long rubroId,
+            @NotBlank String denominacion,
+            @NotNull Long rubroId,
             Long marcaId,
-            Long usuarioId,
-            List<PrecioRequest> precios
+            @NotNull Long usuarioId,
+            @NotEmpty @Valid List<PrecioRequest> precios
     ) {
     }
 
-    public record PrecioRequest(Long listaPrecioId, double precioVenta) {
+    public record PrecioRequest(
+            @NotNull Long listaPrecioId,
+            @NotNull @DecimalMin("0.00") BigDecimal precioVenta
+    ) {
     }
 }

@@ -34,11 +34,14 @@ export function InvoiceContextMenu({ invoice, x, y, onAction, onClose }: Invoice
     onClose();
   };
 
+  const pending = invoice.estado.trim().toUpperCase() === "SIN_EMITIR";
+  const issued = invoice.estado.trim().toUpperCase() === "EMITIDA";
+
   return createPortal(
     <div
       className="context-menu"
       role="menu"
-      aria-label={`Acciones de la factura ${invoice.numeroFactura}`}
+      aria-label={`Acciones de la factura ${invoice.numeroFactura ?? `borrador ${invoice.id}`}`}
       style={{ left: x, top: y }}
       onPointerDown={(event) => event.stopPropagation()}
       onContextMenu={(event) => event.preventDefault()}
@@ -46,17 +49,18 @@ export function InvoiceContextMenu({ invoice, x, y, onAction, onClose }: Invoice
       <button type="button" role="menuitem" onClick={() => run("view")}>
         <i className="ph ph-eye" aria-hidden="true" /><span>Ver factura</span>
       </button>
-      <button type="button" role="menuitem" onClick={() => run("edit")}>
+      {pending && <button type="button" role="menuitem" onClick={() => run("emit")}>
+        <i className="ph ph-seal-check" aria-hidden="true" /><span>Validar y emitir</span>
+      </button>}
+      {pending && <button type="button" role="menuitem" onClick={() => run("edit")}>
         <i className="ph ph-pencil-simple" aria-hidden="true" /><span>Editar</span>
-      </button>
-      {invoice.estado.trim().toUpperCase() !== "ANULADA" && (
-        <button type="button" role="menuitem" onClick={() => run("annul")}>
-          <i className="ph ph-prohibit" aria-hidden="true" /><span>Anular</span>
-        </button>
-      )}
-      <button type="button" role="menuitem" data-danger="true" onClick={() => run("delete")}>
+      </button>}
+      {pending && <button type="button" role="menuitem" data-danger="true" onClick={() => run("delete")}>
         <i className="ph ph-trash" aria-hidden="true" /><span>Eliminar</span>
-      </button>
+      </button>}
+      {issued && <button type="button" role="menuitem" data-danger="true" onClick={() => run("annul")}>
+        <i className="ph ph-prohibit" aria-hidden="true" /><span>Anular</span>
+      </button>}
     </div>,
     document.body,
   );

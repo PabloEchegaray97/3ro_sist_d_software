@@ -39,3 +39,13 @@ out/
 ### Frontend TypeScript ###
 frontend/node_modules/
 frontend/dist/
+
+### Credenciales ARCA ###
+*.p12
+*.pfx
+*.pem
+*.key
+*.crt
+ticket-*.properties
+.env
+.env.*
