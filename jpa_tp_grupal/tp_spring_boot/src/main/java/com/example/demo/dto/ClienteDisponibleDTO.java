@@ -1,9 +1,11 @@
 package com.example.demo.dto;
 
+import com.example.demo.model.TipoDocumento;
 import java.util.Date;
 
 public record ClienteDisponibleDTO(
         Long id,
+        TipoDocumento tipoDocumento,
         String cuitCuil,
         String denominacion,
         Long condicionIvaId,
@@ -17,6 +19,7 @@ public record ClienteDisponibleDTO(
         String listaPrecioCodigo,
         String listaPrecio,
         Date fechaAlta,
+        Date fechaBaja,
         Date ultimaCompra
 ) {
 }

@@ -1,6 +1,7 @@
 package com.example.demo.dto;
 
 import java.math.BigDecimal;
+import java.util.Date;
 
 public record ArticuloDisponibleDTO(
         Long listaPrecioArticuloId,
@@ -13,6 +14,7 @@ public record ArticuloDisponibleDTO(
         String marca,
         Long listaPrecioId,
         String listaPrecioCodigo,
-        BigDecimal precioVenta
+        BigDecimal precioVenta,
+        Date fechaBaja
 ) {
 }

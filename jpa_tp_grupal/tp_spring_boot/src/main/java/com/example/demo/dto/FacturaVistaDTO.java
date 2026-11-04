@@ -26,6 +26,7 @@ public class FacturaVistaDTO {
     private String puntoVentaDomicilio;
     private int tipoComprobante;
     private Long clienteId;
+    private String clienteTipoDocumento;
     private String clienteDenominacion;
     private String clienteCuitCuil;
     private String clienteTelefono;

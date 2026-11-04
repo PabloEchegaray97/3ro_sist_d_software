@@ -34,6 +34,7 @@ public class FacturaReporteRepository {
                 " f.id, " +
                 " f.numero, " +
                 " f.fechaEmision, " +
+                " f.fechaAlta, " +
                 " COALESCE(c.denominacion, 'Consumidor Final'), " +
                 " ci.denominacion, " +
                 " pv.descripcion, " +
@@ -78,9 +79,9 @@ public class FacturaReporteRepository {
         // CONSIGNA - PARTE 2.3: GROUP BY permite calcular COUNT(d), es decir,
         // la cantidad de detalles de cada factura.
         jpql.append(
-                "GROUP BY f.id, f.numero, f.fechaEmision, c.denominacion, " +
+                "GROUP BY f.id, f.numero, f.fechaEmision, f.fechaAlta, c.denominacion, " +
                 "ci.denominacion, pv.descripcion, f.importeTotal, f.estado " +
-                "ORDER BY f.fechaEmision, f.numero"
+                "ORDER BY COALESCE(f.fechaEmision, f.fechaAlta) DESC, f.numero DESC"
         );
 
         TypedQuery<FacturaReporteDTO> query = entityManager.createQuery(
@@ -106,7 +107,7 @@ public class FacturaReporteRepository {
     public Optional<FacturaReporteDTO> buscarReportePorId(Long id) {
         String jpql =
                 "SELECT new com.example.demo.dto.FacturaReporteDTO(" +
-                " f.id, f.numero, f.fechaEmision, " +
+                " f.id, f.numero, f.fechaEmision, f.fechaAlta, " +
                 " COALESCE(c.denominacion, 'Consumidor Final'), " +
                 " ci.denominacion, pv.descripcion, f.importeTotal, COUNT(d), f.estado) " +
                 "FROM FacturaVenta f " +
@@ -115,7 +116,7 @@ public class FacturaReporteRepository {
                 "JOIN f.puntoVenta pv " +
                 "JOIN f.detalles d " +
                 "WHERE f.id = :id " +
-                "GROUP BY f.id, f.numero, f.fechaEmision, c.denominacion, " +
+                "GROUP BY f.id, f.numero, f.fechaEmision, f.fechaAlta, c.denominacion, " +
                 "ci.denominacion, pv.descripcion, f.importeTotal, f.estado";
 
         return entityManager.createQuery(jpql, FacturaReporteDTO.class)

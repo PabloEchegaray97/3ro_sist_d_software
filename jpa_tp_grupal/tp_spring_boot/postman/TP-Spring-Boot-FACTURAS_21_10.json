@@ -92,7 +92,7 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"cuitCuil\": \"30-12345678-9\",\n  \"denominacion\": \"Empresa Tech S.A.\",\n  \"email\": \"contacto@empresa-tech.com\",\n  \"telefono\": \"2614000000\",\n  \"celular\": \"2615000000\",\n  \"nombreCalle\": \"San Martin\",\n  \"numeroCalle\": \"100\",\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"listaPrecioId\": null,\n  \"usuarioId\": {{usuarioId}}\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"tipoDocumento\": \"CUIT\",\n  \"cuitCuil\": \"30-00000000-7\",\n  \"denominacion\": \"Empresa Tech S.A.\",\n  \"email\": \"contacto@empresa-tech.com\",\n  \"telefono\": \"2614000000\",\n  \"celular\": \"2615000000\",\n  \"nombreCalle\": \"San Martin\",\n  \"numeroCalle\": \"100\",\n  \"condicionIvaId\": {{condicionIvaId}},\n  \"listaPrecioId\": null,\n  \"usuarioId\": {{usuarioId}}\n}" },
             "url": "{{baseUrl}}/api/datos-maestros/clientes",
             "description": "Crea cliente, contacto y domicilio, y lo vincula con {{condicionIvaId}}. Guarda el ID en {{clienteId}}. En una factura puede enviarse clienteId null para obtener Consumidor Final."
           },

@@ -13,6 +13,7 @@ const dateOrDash = (value: string | null) => value ? dateTimeParts(value).date :
 
 export function ClientsView({ service }: { service: FacturaService }) {
   const [order, setOrder] = useState("ULTIMOS_AGREGADOS");
+  const [statusFilter, setStatusFilter] = useState("ACTIVOS");
   const [formOpen, setFormOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClienteDisponibleDTO | null>(null);
   const [deletingClient, setDeletingClient] = useState<ClienteDisponibleDTO | null>(null);
@@ -20,13 +21,13 @@ export function ClientsView({ service }: { service: FacturaService }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const columns = useMemo<ExplorerColumn<ClienteDisponibleDTO>[]>(() => [
     { header: "ID", render: (item) => item.id, searchValue: (item) => item.id },
-    { header: "CUIT/CUIL", render: (item) => <>{item.cuitCuil}<small>{valueOrDash(item.condicionIva)}</small><small>Lista: {item.listaPrecio ?? "Sin asignar"}</small></>, searchValue: (item) => item.cuitCuil },
-    { header: "Denominación", render: (item) => <>{item.denominacion}<small>Alta el {dateOrDash(item.fechaAlta)}</small></>, searchValue: (item) => item.denominacion },
+    { header: "Documento", render: (item) => <>{item.tipoDocumento} {item.cuitCuil}<small>{valueOrDash(item.condicionIva)}</small><small>Lista: {item.listaPrecio ?? "Sin asignar"}</small></>, searchValue: (item) => `${item.tipoDocumento} ${item.cuitCuil}` },
+    { header: "Denominación", render: (item) => <>{item.denominacion}<small>Alta el {dateOrDash(item.fechaAlta)}</small>{item.fechaBaja && <small>Eliminado el {dateOrDash(item.fechaBaja)}</small>}</>, searchValue: (item) => item.denominacion },
     { header: "Contacto", render: (item) => <>{valueOrDash(item.telefono)}{item.celular && <small>Cel. {item.celular}</small>}{item.email && <small>{item.email}</small>}</>, searchValue: (item) => item.email },
     { header: "Domicilio", render: (item) => valueOrDash([item.nombreCalle, item.numeroCalle].filter(Boolean).join(" ")), searchValue: (item) => item.nombreCalle },
     { header: "Última compra", render: (item) => dateOrDash(item.ultimaCompra), searchValue: (item) => item.ultimaCompra },
   ], []);
-  const loadPage = useCallback((search: string, page: number, size: number) => service.buscarClientesDisponibles(search, page, size, order), [order, service]);
+  const loadPage = useCallback((search: string, page: number, size: number) => service.buscarClientesDisponibles(search, page, size, order, statusFilter), [order, service, statusFilter]);
 
   const closeForm = () => {
     setFormOpen(false);
@@ -54,7 +55,7 @@ export function ClientsView({ service }: { service: FacturaService }) {
   };
 
   return <>
-    <PaginatedDataView title="Clientes" description="Consultá y administrá los clientes disponibles para facturación." searchPlaceholder="Buscar por cualquier dato del cliente…" emptyText="No hay clientes para mostrar." columns={columns} getKey={(item) => item.id} getItemLabel={(item) => item.denominacion} loadPage={loadPage} actionLabel="Nuevo cliente" actionIcon="ph-plus" onAction={() => setFormOpen(true)} onEdit={(item) => setEditingClient(item)} onDelete={(item) => setDeletingClient(item)} refreshKey={refreshKey} tableClassName="clients-data-table" controls={<select className="explorer-order-select" aria-label="Ordenar clientes" value={order} onChange={(e) => setOrder(e.target.value)}><option value="ULTIMOS_AGREGADOS">Últimos agregados</option><option value="COMPRADOR_RECIENTE">Comprador reciente</option></select>} />
+    <PaginatedDataView title="Clientes" description="Consultá y administrá los clientes disponibles para facturación." searchPlaceholder="Buscar por cualquier dato del cliente…" emptyText="No hay clientes para mostrar." columns={columns} getKey={(item) => item.id} getItemLabel={(item) => item.denominacion} loadPage={loadPage} actionLabel="Nuevo cliente" actionIcon="ph-plus" onAction={() => setFormOpen(true)} onEdit={(item) => setEditingClient(item)} onDelete={(item) => setDeletingClient(item)} isItemInactive={(item) => item.fechaBaja != null} refreshKey={refreshKey} tableClassName="clients-data-table" controls={<><select className="explorer-order-select" aria-label="Estado de clientes" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="ACTIVOS">Activos</option><option value="ELIMINADOS">Eliminados</option></select><select className="explorer-order-select" aria-label="Ordenar clientes" value={order} onChange={(e) => setOrder(e.target.value)}><option value="ULTIMOS_AGREGADOS">Últimos agregados</option><option value="COMPRADOR_RECIENTE">Comprador reciente</option></select></>} />
     <ClientFormModal open={formOpen || editingClient != null} client={editingClient} service={service} onClose={closeForm} onSaved={saved} />
     <DeactivateEntityModal open={deletingClient != null} entityType="cliente" entityName={deletingClient?.denominacion ?? ""} busy={deleting} onClose={() => { if (!deleting) setDeletingClient(null); }} onConfirm={() => void confirmDelete()} />
   </>;

@@ -6,6 +6,7 @@ public record CatalogoItemDTO(
         Long id,
         Integer codigo,
         String denominacion,
-        Date fechaAlta
+        Date fechaAlta,
+        Date fechaBaja
 ) {
 }

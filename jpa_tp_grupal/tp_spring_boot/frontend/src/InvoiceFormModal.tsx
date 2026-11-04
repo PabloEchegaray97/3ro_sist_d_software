@@ -82,6 +82,7 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
       if (invoice) {
         setSelectedClient(invoice.clienteId == null ? null : {
           id: invoice.clienteId,
+          tipoDocumento: invoice.clienteTipoDocumento ?? "CUIT",
           cuitCuil: "",
           denominacion: invoice.clienteDenominacion,
           condicionIvaId: invoice.condicionIvaId,
@@ -95,6 +96,7 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
           listaPrecioCodigo: invoice.listaPrecioCodigo,
           listaPrecio: invoice.listaPrecio,
           fechaAlta: "",
+          fechaBaja: null,
           ultimaCompra: null,
         });
         if (invoice.clienteId != null) {
@@ -328,7 +330,7 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
                 <div className="field"><span>Número</span><span className="invoice-text-value">Se asigna al emitir</span></div>
                 <div className="field"><span>Fecha y hora</span><span className="invoice-text-value">Se asigna al emitir</span></div>
                 <div className="field"><span>Punto de venta</span><span className="invoice-text-value">{summaryPoint}</span></div>
-                <div className="field"><span>Cliente</span><span className="invoice-text-value">{selectedClient?.denominacion ?? "Consumidor final"}{selectedClient?.cuitCuil && <small>{selectedClient.cuitCuil}</small>}</span></div>
+                <div className="field"><span>Cliente</span><span className="invoice-text-value">{selectedClient?.denominacion ?? "Consumidor final"}{selectedClient?.cuitCuil && <small>{selectedClient.tipoDocumento} {selectedClient.cuitCuil}</small>}</span></div>
                 <div className="field"><span>Lista de precios</span><span className="invoice-text-value">{summaryPriceList}</span></div>
                 <div className="field"><span>Condición de IVA</span><span className="invoice-text-value">{summaryTaxCondition}</span></div>
                 <div className="field"><span>Tipo de moneda</span><span className="invoice-text-value">{summaryCurrency}</span></div>
@@ -352,7 +354,7 @@ export function InvoiceFormModal({ mode, service, onSaved, onClose }: InvoiceFor
                     <div className="client-selected-value">
                       <span className="client-selected-copy">
                         <strong>{selectedClient?.denominacion ?? "Consumidor final"}</strong>
-                        {selectedClient?.cuitCuil && <small>{selectedClient.cuitCuil}</small>}
+                        {selectedClient?.cuitCuil && <small>{selectedClient.tipoDocumento} {selectedClient.cuitCuil}</small>}
                       </span>
                       {selectedClient && <IconButton type="button" className="client-clear" icon="ph-x" label="Quitar cliente" onClick={() => changeClient(null)} />}
                     </div>

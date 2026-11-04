@@ -35,7 +35,7 @@ export function InvoiceContextMenu({ invoice, x, y, onAction, onClose }: Invoice
   };
 
   const pending = invoice.estado.trim().toUpperCase() === "SIN_EMITIR";
-  const issued = invoice.estado.trim().toUpperCase() === "EMITIDA";
+  const annulled = invoice.estado.trim().toUpperCase() === "ANULADA";
 
   return createPortal(
     <div
@@ -58,8 +58,8 @@ export function InvoiceContextMenu({ invoice, x, y, onAction, onClose }: Invoice
       {pending && <button type="button" role="menuitem" data-danger="true" onClick={() => run("delete")}>
         <i className="ph ph-trash" aria-hidden="true" /><span>Eliminar</span>
       </button>}
-      {issued && <button type="button" role="menuitem" data-danger="true" onClick={() => run("annul")}>
-        <i className="ph ph-prohibit" aria-hidden="true" /><span>Anular</span>
+      {annulled && <button type="button" role="menuitem" data-danger="true" onClick={() => run("delete")}>
+        <i className="ph ph-trash" aria-hidden="true" /><span>Eliminar definitivamente</span>
       </button>}
     </div>,
     document.body,

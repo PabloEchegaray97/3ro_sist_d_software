@@ -3,7 +3,7 @@ import { sileo } from "sileo";
 import type { ArticuloAltaListaPrecioOpcionDTO, ArticuloDisponibleDTO } from "./models/factura.dto";
 import type { ExplorerColumn } from "./PaginatedExplorerModal";
 import { FacturaService } from "./services/FacturaService";
-import { errorMessage, money } from "./formatters";
+import { dateTimeParts, errorMessage, money } from "./formatters";
 import { PaginatedDataView } from "./PaginatedDataView";
 import { ArticleFormModal } from "./ArticleFormModal";
 import { DeactivateEntityModal } from "./DeactivateEntityModal";
@@ -16,11 +16,12 @@ export function ArticlesView({ service }: { service: FacturaService }) {
   const [deleting, setDeleting] = useState(false);
   const [priceLists, setPriceLists] = useState<ArticuloAltaListaPrecioOpcionDTO[]>([]);
   const [selectedPriceListId, setSelectedPriceListId] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState("ACTIVOS");
   const [refreshKey, setRefreshKey] = useState(0);
   const columns = useMemo<ExplorerColumn<ArticuloDisponibleDTO>[]>(() => [
     { header: "Artículo ID", render: (item) => item.articuloId, searchValue: (item) => item.articuloId },
     { header: "Código", render: (item) => item.codigo, searchValue: (item) => item.codigo },
-    { header: "Artículo", render: (item) => item.denominacion, searchValue: (item) => item.denominacion },
+    { header: "Artículo", render: (item) => <>{item.denominacion}{item.fechaBaja && <small>Eliminado el {dateTimeParts(item.fechaBaja).date}</small>}</>, searchValue: (item) => item.denominacion },
     { header: "Rubro", render: (item) => item.rubro, searchValue: (item) => item.rubro },
     { header: "Marca", render: (item) => item.marca ?? "—", searchValue: (item) => item.marca },
     { header: "Lista", render: (item) => <span className="price-list-name" data-price-tier={priceListTier(item.listaPrecioCodigo)}>{shortPriceListLabel(item.listaPrecioCodigo)}</span>, searchValue: (item) => item.listaPrecioCodigo },
@@ -44,8 +45,8 @@ export function ArticlesView({ service }: { service: FacturaService }) {
 
   const loadPage = useCallback(
     (search: string, page: number, size: number) =>
-      service.buscarArticulosDisponibles(search, page, size, selectedPriceListId),
-    [selectedPriceListId, service],
+      service.buscarArticulosDisponibles(search, page, size, selectedPriceListId, statusFilter),
+    [selectedPriceListId, service, statusFilter],
   );
 
   const closeForm = () => {
@@ -73,7 +74,7 @@ export function ArticlesView({ service }: { service: FacturaService }) {
     }
   };
   return <>
-    <PaginatedDataView title="Artículos" description="Consultá los artículos y sus precios por lista." searchPlaceholder="Buscar por código, artículo, rubro, marca o lista…" emptyText="No hay artículos para mostrar." columns={columns} getKey={(item) => item.listaPrecioArticuloId} getItemLabel={(item) => item.denominacion} loadPage={loadPage} actionLabel="Nuevo artículo" actionIcon="ph-plus" onAction={() => setFormOpen(true)} onEdit={(item) => setEditingArticleId(item.articuloId)} onDelete={(item) => setDeletingArticle(item)} refreshKey={refreshKey} tableClassName="articles-data-table" controls={<select className="explorer-order-select" aria-label="Lista de precios" value={selectedPriceListId ?? "ALL"} disabled={priceLists.length === 0} onChange={(event) => setSelectedPriceListId(event.target.value === "ALL" ? null : Number(event.target.value))}>{priceLists.length === 0 ? <option value="ALL">Cargando listas…</option> : <option value="ALL">Ver todos</option>}{priceLists.map((list) => <option key={list.id} value={list.id}>{fullPriceListLabel(list.codigo, list.denominacion)}</option>)}</select>} />
+    <PaginatedDataView title="Artículos" description="Consultá los artículos y sus precios por lista." searchPlaceholder="Buscar por código, artículo, rubro, marca o lista…" emptyText="No hay artículos para mostrar." columns={columns} getKey={(item) => item.listaPrecioArticuloId} getItemLabel={(item) => item.denominacion} loadPage={loadPage} actionLabel="Nuevo artículo" actionIcon="ph-plus" onAction={() => setFormOpen(true)} onEdit={(item) => setEditingArticleId(item.articuloId)} onDelete={(item) => setDeletingArticle(item)} isItemInactive={(item) => item.fechaBaja != null} refreshKey={refreshKey} tableClassName="articles-data-table" controls={<><select className="explorer-order-select" aria-label="Estado de artículos" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ACTIVOS">Activos</option><option value="ELIMINADOS">Eliminados</option></select><select className="explorer-order-select" aria-label="Lista de precios" value={selectedPriceListId ?? "ALL"} disabled={priceLists.length === 0} onChange={(event) => setSelectedPriceListId(event.target.value === "ALL" ? null : Number(event.target.value))}>{priceLists.length === 0 ? <option value="ALL">Cargando listas…</option> : <option value="ALL">Ver todos</option>}{priceLists.map((list) => <option key={list.id} value={list.id}>{fullPriceListLabel(list.codigo, list.denominacion)}</option>)}</select></>} />
     <ArticleFormModal open={formOpen || editingArticleId != null} articleId={editingArticleId} service={service} onClose={closeForm} onSaved={saved} />
     <DeactivateEntityModal open={deletingArticle != null} entityType="artículo" entityName={deletingArticle?.denominacion ?? ""} busy={deleting} onClose={() => { if (!deleting) setDeletingArticle(null); }} onConfirm={() => void confirmDelete()} />
   </>;

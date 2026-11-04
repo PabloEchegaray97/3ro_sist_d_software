@@ -327,7 +327,9 @@ public class ReporteExportService {
         SimpleDateFormat fechaQr = new SimpleDateFormat("yyyy-MM-dd");
         String cuit = digitos(arcaProperties.getCuit());
         String documento = factura.getClienteId() == null ? "0" : digitos(factura.getClienteCuitCuil());
-        int tipoDocumento = factura.getClienteId() == null ? 99 : 80;
+        int tipoDocumento = factura.getClienteId() == null
+                ? 99
+                : "CUIL".equalsIgnoreCase(factura.getClienteTipoDocumento()) ? 86 : 80;
         String json = "{" +
                 "\"ver\":1," +
                 "\"fecha\":\"" + fechaQr.format(factura.getFechaEmision()) + "\"," +

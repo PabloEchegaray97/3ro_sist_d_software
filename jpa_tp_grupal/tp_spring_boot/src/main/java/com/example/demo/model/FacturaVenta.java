@@ -51,6 +51,9 @@ public class FacturaVenta extends AuditoriaApp {
     @Builder.Default
     private int tipoComprobante = 11;
 
+    // Un borrador SIN_EMITIR todavía no posee fecha fiscal. Se completa
+    // únicamente cuando ARCA autoriza el comprobante.
+    @Column(name = "fecha_emision", nullable = true)
     @Temporal(TemporalType.TIMESTAMP)
     private Date fechaEmision;
 

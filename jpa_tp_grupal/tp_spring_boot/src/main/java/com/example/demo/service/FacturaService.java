@@ -131,6 +131,7 @@ public class FacturaService {
                 factura.getPuntoVenta().getDomicilioComercial(),
                 factura.getTipoComprobante(),
                 cliente == null ? null : cliente.getId(),
+                cliente == null ? null : cliente.getTipoDocumento().name(),
                 cliente == null ? "Consumidor Final" : cliente.getDenominacion(),
                 cliente == null ? null : cliente.getCuitCuil(),
                 cliente == null ? null : primerValor(cliente.getContacto().getTelefono(), cliente.getContacto().getCelular()),
@@ -246,8 +247,11 @@ public class FacturaService {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void eliminar(Long id) {
         FacturaVenta factura = facturaEscrituraRepository.buscarFacturaParaActualizar(id);
-        if (factura.getEstado() != EstadoFactura.SIN_EMITIR) {
-            throw new ConflictoNegocioException("Solo se pueden eliminar facturas sin emitir");
+        if (factura.getEstado() != EstadoFactura.SIN_EMITIR
+                && factura.getEstado() != EstadoFactura.ANULADA) {
+            throw new ConflictoNegocioException(
+                    "Solo se pueden eliminar definitivamente facturas sin emitir o anuladas"
+            );
         }
         facturaEscrituraRepository.eliminar(factura);
     }

@@ -9,6 +9,7 @@ interface AppSidebarProps {
   arcaConfigurationError: boolean;
   onChange: (section: InvoiceSection) => void;
   onInfo: () => void;
+  onNewInvoice: () => void;
 }
 
 export function AppSidebar({
@@ -17,6 +18,7 @@ export function AppSidebar({
   arcaConfigurationError,
   onChange,
   onInfo,
+  onNewInvoice,
 }: AppSidebarProps) {
   const navigate = (event: MouseEvent<HTMLAnchorElement>, section: InvoiceSection) => {
     event.preventDefault();
@@ -55,6 +57,9 @@ export function AppSidebar({
       <footer className="sidebar-footer">
         <button type="button" className="sidebar-info" onClick={onInfo}>
           <i className="ph ph-info" aria-hidden="true" /><span>Info</span>
+        </button>
+        <button type="button" className="sidebar-new-invoice" onClick={onNewInvoice}>
+          <i className="ph ph-plus" aria-hidden="true" /><span>Nueva factura</span>
         </button>
         <span
           className="sidebar-environment"

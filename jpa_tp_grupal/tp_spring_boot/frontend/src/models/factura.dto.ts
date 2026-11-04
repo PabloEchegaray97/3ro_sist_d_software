@@ -3,6 +3,7 @@ export interface FacturaReporteDTO {
   id: number;
   numeroFactura: number | null;
   fechaEmision: string | null;
+  fechaCreacionInterna: string;
   clienteDenominacion: string;
   condicionIva: string;
   puntoVentaDescripcion: string;
@@ -48,6 +49,7 @@ export interface FacturaVistaDTO {
   puntoVentaDomicilio: string | null;
   tipoComprobante: number;
   clienteId: number | null;
+  clienteTipoDocumento: "CUIT" | "CUIL" | null;
   clienteDenominacion: string;
   clienteCuitCuil: string | null;
   clienteTelefono: string | null;
@@ -135,10 +137,12 @@ export interface ArticuloDisponibleDTO {
   listaPrecioId: number;
   listaPrecioCodigo: string;
   precioVenta: number;
+  fechaBaja: string | null;
 }
 
 export interface ClienteDisponibleDTO {
   id: number;
+  tipoDocumento: "CUIT" | "CUIL";
   cuitCuil: string;
   denominacion: string;
   condicionIvaId: number | null;
@@ -152,6 +156,7 @@ export interface ClienteDisponibleDTO {
   listaPrecioCodigo: string | null;
   listaPrecio: string | null;
   fechaAlta: string;
+  fechaBaja: string | null;
   ultimaCompra: string | null;
 }
 
@@ -233,6 +238,7 @@ export interface PuntoVentaRequestDTO {
 }
 
 export interface ClienteRequestDTO {
+  tipoDocumento: "CUIT" | "CUIL";
   cuitCuil: string;
   denominacion: string;
   email: string | null;
@@ -322,6 +328,7 @@ export interface CatalogoItemDTO {
   codigo: number;
   denominacion: string;
   fechaAlta: string;
+  fechaBaja: string | null;
 }
 
 export interface RubroRequestDTO {

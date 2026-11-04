@@ -34,6 +34,7 @@ public final class DatosMaestrosDTO {
     }
 
     public record ClienteRequest(
+            @NotBlank String tipoDocumento,
             @NotBlank String cuitCuil,
             @NotBlank String denominacion,
             String email,

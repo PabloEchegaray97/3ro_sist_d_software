@@ -1,8 +1,8 @@
 import type { FacturaReporteDTO } from "./models/factura.dto";
 
-export type InvoiceAction = "view" | "edit" | "emit" | "annul" | "delete";
+export type InvoiceAction = "view" | "edit" | "emit" | "delete";
 
 export interface PendingInvoiceAction {
-  action: "annul" | "delete";
+  action: "delete";
   invoice: FacturaReporteDTO;
 }

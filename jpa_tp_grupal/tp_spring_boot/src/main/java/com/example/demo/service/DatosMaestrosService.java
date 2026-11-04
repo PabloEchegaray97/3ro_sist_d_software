@@ -22,6 +22,7 @@ import com.example.demo.model.Marca;
 import com.example.demo.model.PuntoVenta;
 import com.example.demo.model.Rubro;
 import com.example.demo.model.TipoMoneda;
+import com.example.demo.model.TipoDocumento;
 import com.example.demo.model.Usuario;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -365,14 +366,14 @@ public class DatosMaestrosService {
             String busqueda,
             int pagina,
             int tamanio,
-            Long listaPrecioId
+            Long listaPrecioId,
+            String estado
     ) {
         int paginaSegura = Math.max(0, pagina);
         int tamanioSeguro = Math.max(1, Math.min(tamanio, 100));
         String patron = patron(busqueda);
-        String filtro = """
-                WHERE articulo.fechaBaja IS NULL
-                AND precio.fechaBaja IS NULL
+        String filtro = " WHERE " + condicionEstado("articulo", estado)
+                + " AND " + condicionEstado("precio", estado) + " " + """
                 AND (:listaPrecioId IS NULL OR lista.id = :listaPrecioId)
                 AND (:patron = '%%' OR
                     LOWER(CAST(precio.id AS string)) LIKE :patron OR
@@ -401,7 +402,8 @@ public class DatosMaestrosService {
                     marca.denominacion,
                     lista.id,
                     lista.codigo,
-                    precio.precioVenta
+                    precio.precioVenta,
+                    articulo.fechaBaja
                 )
                 FROM ListaPrecioArticulo precio
                 JOIN precio.articulo articulo
@@ -437,14 +439,16 @@ public class DatosMaestrosService {
             String busqueda,
             int pagina,
             int tamanio,
-            String orden
+            String orden,
+            String estado
     ) {
         int paginaSegura = Math.max(0, pagina);
         int tamanioSeguro = Math.max(1, Math.min(tamanio, 100));
         String patron = patron(busqueda);
-        String filtro = """
-                WHERE cliente.fechaBaja IS NULL AND (:patron = '%%' OR
+        String filtro = " WHERE " + condicionEstado("cliente", estado) + " " + """
+                AND (:patron = '%%' OR
                     LOWER(CAST(cliente.id AS string)) LIKE :patron OR
+                    LOWER(CAST(cliente.tipoDocumento AS string)) LIKE :patron OR
                     LOWER(cliente.cuitCuil) LIKE :patron OR
                     LOWER(cliente.denominacion) LIKE :patron OR
                     LOWER(CAST(condicion.id AS string)) LIKE :patron OR
@@ -463,6 +467,7 @@ public class DatosMaestrosService {
         List<ClienteDisponibleDTO> contenido = entityManager.createQuery("""
                 SELECT new com.example.demo.dto.ClienteDisponibleDTO(
                     cliente.id,
+                    cliente.tipoDocumento,
                     cliente.cuitCuil,
                     cliente.denominacion,
                     condicion.id,
@@ -476,6 +481,7 @@ public class DatosMaestrosService {
                     listaCliente.codigo,
                     listaCliente.denominacion,
                     cliente.fechaAlta,
+                    cliente.fechaBaja,
                     MAX(factura.fechaEmision)
                 )
                 FROM Cliente cliente
@@ -485,12 +491,12 @@ public class DatosMaestrosService {
                 LEFT JOIN cliente.listaPrecioPredeterminada listaCliente
                 LEFT JOIN FacturaVenta factura ON factura.cliente = cliente
                 """ + filtro + """
-                GROUP BY cliente.id, cliente.cuitCuil, cliente.denominacion,
+                GROUP BY cliente.id, cliente.tipoDocumento, cliente.cuitCuil, cliente.denominacion,
                     condicion.id, condicion.denominacion,
                     contacto.email, contacto.telefono, contacto.celular,
                     domicilio.nombreCalle, domicilio.numeroCalle,
                     listaCliente.id, listaCliente.codigo, listaCliente.denominacion,
-                    cliente.fechaAlta
+                    cliente.fechaAlta, cliente.fechaBaja
                 """ + ordenClientes(orden), ClienteDisponibleDTO.class)
                 .setParameter("patron", patron)
                 .setFirstResult(paginaSegura * tamanioSeguro)
@@ -755,7 +761,8 @@ public class DatosMaestrosService {
                 request.condicionIvaId(),
                 "condicionIvaId"
         );
-        requerido(request.cuitCuil(), "cuitCuil");
+        TipoDocumento tipoDocumento = tipoDocumento(request.tipoDocumento());
+        String documento = documentoValido(request.cuitCuil(), tipoDocumento);
         requerido(request.denominacion(), "denominacion");
 
         Contacto contacto = new Contacto();
@@ -768,7 +775,8 @@ public class DatosMaestrosService {
         domicilio.setNumeroCalle(request.numeroCalle());
 
         Cliente entidad = auditar(new Cliente(), usuario);
-        entidad.setCuitCuil(request.cuitCuil().trim());
+        entidad.setTipoDocumento(tipoDocumento);
+        entidad.setCuitCuil(documento);
         entidad.setDenominacion(request.denominacion().trim());
         entidad.setCondicionIva(condicionIva);
         entidad.setListaPrecioPredeterminada(
@@ -799,10 +807,12 @@ public class DatosMaestrosService {
                 request.condicionIvaId(),
                 "condicionIvaId"
         );
-        requerido(request.cuitCuil(), "cuitCuil");
+        TipoDocumento tipoDocumento = tipoDocumento(request.tipoDocumento());
+        String documento = documentoValido(request.cuitCuil(), tipoDocumento);
         requerido(request.denominacion(), "denominacion");
 
-        cliente.setCuitCuil(request.cuitCuil().trim());
+        cliente.setTipoDocumento(tipoDocumento);
+        cliente.setCuitCuil(documento);
         cliente.setDenominacion(request.denominacion().trim());
         cliente.setCondicionIva(condicionIva);
         cliente.setListaPrecioPredeterminada(
@@ -830,6 +840,37 @@ public class DatosMaestrosService {
         actualizarAuditoria(cliente, usuario);
         entityManager.flush();
         return new EntidadCreadaDTO(cliente.getId(), cliente.getDenominacion());
+    }
+
+    private TipoDocumento tipoDocumento(String valor) {
+        requerido(valor, "tipoDocumento");
+        try {
+            return TipoDocumento.valueOf(valor.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("tipoDocumento debe ser CUIT o CUIL");
+        }
+    }
+
+    private String documentoValido(String valor, TipoDocumento tipo) {
+        requerido(valor, "cuitCuil");
+        String digitos = valor.replaceAll("\\D", "");
+        if (digitos.length() != 11) {
+            throw new IllegalArgumentException(tipo + " debe contener 11 dígitos");
+        }
+
+        int[] pesos = {5, 4, 3, 2, 7, 6, 5, 4, 3, 2};
+        int suma = 0;
+        for (int indice = 0; indice < pesos.length; indice++) {
+            suma += Character.digit(digitos.charAt(indice), 10) * pesos[indice];
+        }
+        int verificador = 11 - (suma % 11);
+        if (verificador == 11) verificador = 0;
+        if (verificador == 10) verificador = 9;
+        if (Character.digit(digitos.charAt(10), 10) != verificador) {
+            throw new IllegalArgumentException(tipo + " no tiene un dígito verificador válido");
+        }
+
+        return digitos.substring(0, 2) + "-" + digitos.substring(2, 10) + "-" + digitos.substring(10);
     }
 
     @Transactional
@@ -870,8 +911,8 @@ public class DatosMaestrosService {
     }
 
     @Transactional(readOnly = true)
-    public PaginaDTO<CatalogoItemDTO> buscarRubros(String busqueda, int pagina, int tamanio) {
-        return buscarCatalogo(Rubro.class, busqueda, pagina, tamanio);
+    public PaginaDTO<CatalogoItemDTO> buscarRubros(String busqueda, int pagina, int tamanio, String estado) {
+        return buscarCatalogo(Rubro.class, busqueda, pagina, tamanio, estado);
     }
 
     @Transactional
@@ -907,8 +948,8 @@ public class DatosMaestrosService {
     }
 
     @Transactional(readOnly = true)
-    public PaginaDTO<CatalogoItemDTO> buscarMarcas(String busqueda, int pagina, int tamanio) {
-        return buscarCatalogo(Marca.class, busqueda, pagina, tamanio);
+    public PaginaDTO<CatalogoItemDTO> buscarMarcas(String busqueda, int pagina, int tamanio, String estado) {
+        return buscarCatalogo(Marca.class, busqueda, pagina, tamanio, estado);
     }
 
     @Transactional
@@ -1189,13 +1230,14 @@ public class DatosMaestrosService {
             Class<T> tipo,
             String busqueda,
             int pagina,
-            int tamanio
+            int tamanio,
+            String estado
     ) {
         int paginaSegura = Math.max(0, pagina);
         int tamanioSeguro = Math.max(1, Math.min(tamanio, 100));
         String nombreEntidad = tipo.getSimpleName();
         String patron = patron(busqueda);
-        String filtro = " WHERE item.fechaBaja IS NULL AND (" +
+        String filtro = " WHERE " + condicionEstado("item", estado) + " AND (" +
                 ":patron = '%%' OR " +
                 "LOWER(CAST(item.id AS string)) LIKE :patron OR " +
                 "LOWER(CAST(item.codigo AS string)) LIKE :patron OR " +
@@ -1213,12 +1255,14 @@ public class DatosMaestrosService {
                 .map(item -> {
                     if (item instanceof Rubro rubro) {
                         return new CatalogoItemDTO(
-                                rubro.getId(), rubro.getCodigo(), rubro.getDenominacion(), rubro.getFechaAlta()
+                                rubro.getId(), rubro.getCodigo(), rubro.getDenominacion(),
+                                rubro.getFechaAlta(), rubro.getFechaBaja()
                         );
                     }
                     Marca marca = (Marca) item;
                     return new CatalogoItemDTO(
-                            marca.getId(), marca.getCodigo(), marca.getDenominacion(), marca.getFechaAlta()
+                            marca.getId(), marca.getCodigo(), marca.getDenominacion(),
+                            marca.getFechaAlta(), marca.getFechaBaja()
                     );
                 })
                 .toList();
@@ -1228,6 +1272,15 @@ public class DatosMaestrosService {
                 ).setParameter("patron", patron)
                 .getSingleResult();
         return pagina(contenido, paginaSegura, tamanioSeguro, total);
+    }
+
+    private String condicionEstado(String alias, String estado) {
+        String valor = estado == null ? "ACTIVOS" : estado.trim().toUpperCase();
+        return switch (valor) {
+            case "ACTIVOS" -> alias + ".fechaBaja IS NULL";
+            case "ELIMINADOS" -> alias + ".fechaBaja IS NOT NULL";
+            default -> throw new IllegalArgumentException("estado debe ser ACTIVOS o ELIMINADOS");
+        };
     }
 
     private void validarActivo(AuditoriaApp entidad, String nombre) {

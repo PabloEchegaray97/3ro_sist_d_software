@@ -29,12 +29,22 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler({ConflictoNegocioException.class, OptimisticLockException.class,
-            PessimisticLockException.class, DataIntegrityViolationException.class})
+            PessimisticLockException.class})
     public ResponseEntity<ProblemDetail> manejarConflicto(Exception ex) {
         String detalle = ex instanceof ConflictoNegocioException
                 ? ex.getMessage()
-                : "El recurso fue modificado por otra operación o viola una restricción única";
+                : "El recurso fue modificado por otra operación concurrente";
         return problema(HttpStatus.CONFLICT, "Conflicto de negocio", detalle, "conflicto");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ProblemDetail> manejarIntegridad(DataIntegrityViolationException ex) {
+        return problema(
+                HttpStatus.CONFLICT,
+                "No se pudo guardar la información",
+                "La base de datos rechazó uno de los valores obligatorios o duplicados",
+                "integridad"
+        );
     }
 
     @ExceptionHandler(PrecisionMonetariaException.class)

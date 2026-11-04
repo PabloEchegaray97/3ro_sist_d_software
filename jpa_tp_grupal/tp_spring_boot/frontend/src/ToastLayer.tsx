@@ -8,14 +8,36 @@ const currentLayer = (): HTMLElement => {
 };
 
 export function ToastLayer() {
-  const [target, setTarget] = useState<HTMLElement>(() => currentLayer());
+  // El host conserva siempre la misma identidad. Solo cambia de padre para
+  // quedar dentro del dialog activo y, por lo tanto, sobre su top layer.
+  // Así Toaster no se desmonta y su temporizador no vuelve a empezar.
+  const [host] = useState<HTMLDivElement>(() => {
+    const element = document.createElement("div");
+    element.dataset.toastLayerHost = "true";
+    return element;
+  });
 
   useEffect(() => {
-    const syncLayer = () => setTarget(currentLayer());
-    window.addEventListener("app-dialog-stack-change", syncLayer);
-    syncLayer();
-    return () => window.removeEventListener("app-dialog-stack-change", syncLayer);
-  }, []);
+    const syncLayer = () => {
+      const layer = currentLayer();
+      if (host.parentElement !== layer) layer.appendChild(host);
+    };
+    const observer = new MutationObserver(syncLayer);
 
-  return createPortal(<Toaster position="top-center" />, target);
+    window.addEventListener("app-dialog-stack-change", syncLayer);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["open"],
+    });
+    syncLayer();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("app-dialog-stack-change", syncLayer);
+      host.remove();
+    };
+  }, [host]);
+
+  return createPortal(<Toaster position="top-center" />, host);
 }

@@ -16,12 +16,13 @@ interface ClientFormModalProps {
 export function ClientFormModal({ open, client, service, onClose, onSaved }: ClientFormModalProps) {
   const [options, setOptions] = useState<FacturaOpcionesDTO | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ cuitCuil: "", denominacion: "", condicionIvaId: "", listaPrecioId: "", email: "", telefono: "", celular: "", nombreCalle: "", numeroCalle: "" });
+  const [form, setForm] = useState({ tipoDocumento: "CUIT" as "CUIT" | "CUIL", cuitCuil: "", denominacion: "", condicionIvaId: "", listaPrecioId: "", email: "", telefono: "", celular: "", nombreCalle: "", numeroCalle: "" });
 
   useEffect(() => {
     if (!open) return;
     let active = true;
     setForm({
+      tipoDocumento: client?.tipoDocumento ?? "CUIT",
       cuitCuil: client?.cuitCuil ?? "",
       denominacion: client?.denominacion ?? "",
       condicionIvaId: client?.condicionIvaId == null ? "" : String(client.condicionIvaId),
@@ -55,7 +56,7 @@ export function ClientFormModal({ open, client, service, onClose, onSaved }: Cli
     if (saving) return;
     if (!options?.usuario) return;
     const request: ClienteRequestDTO = {
-      cuitCuil: form.cuitCuil, denominacion: form.denominacion,
+      tipoDocumento: form.tipoDocumento, cuitCuil: form.cuitCuil, denominacion: form.denominacion,
       email: form.email || null, telefono: form.telefono || null, celular: form.celular || null,
       nombreCalle: form.nombreCalle || null, numeroCalle: form.numeroCalle || null,
       condicionIvaId: Number(form.condicionIvaId), listaPrecioId: form.listaPrecioId ? Number(form.listaPrecioId) : null,
@@ -75,7 +76,8 @@ export function ClientFormModal({ open, client, service, onClose, onSaved }: Cli
   return <Modal open={open} title={client ? "Editar cliente" : "Nuevo cliente"} className="wide-dialog" closeDisabled={saving} onClose={onClose}>
     <form onSubmit={submit}>
       <fieldset className="entity-form-grid" disabled={saving}>
-        <label><span>CUIT/CUIL</span><input required value={form.cuitCuil} onChange={(e) => update("cuitCuil", e.target.value)} /></label>
+        <label><span>Tipo de documento</span><select required value={form.tipoDocumento} onChange={(e) => update("tipoDocumento", e.target.value)}><option value="CUIT">CUIT</option><option value="CUIL">CUIL</option></select></label>
+        <label><span>{form.tipoDocumento}</span><input required inputMode="numeric" maxLength={13} placeholder="XX-XXXXXXXX-X" value={form.cuitCuil} onChange={(e) => update("cuitCuil", e.target.value)} /><small>Se validan los 11 dígitos y su dígito verificador.</small></label>
         <label><span>Denominación</span><input required value={form.denominacion} onChange={(e) => update("denominacion", e.target.value)} /></label>
         <label><span>Condición de IVA</span><select required value={form.condicionIvaId} onChange={(e) => update("condicionIvaId", e.target.value)}>{options?.condicionesIva.map((item) => <option key={item.id} value={item.id}>{item.descripcion}</option>)}</select></label>
         <label><span>Lista de precios</span><select value={form.listaPrecioId} onChange={(e) => update("listaPrecioId", e.target.value)}>{options?.listasPrecio.map((item) => <option key={item.id} value={item.id}>{item.descripcion}</option>)}</select></label>

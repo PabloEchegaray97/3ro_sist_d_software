@@ -193,7 +193,7 @@ public class ArcaHomologacionService {
     private ResultadoArca solicitarCae(Ticket ticket, long cuit, FacturaVenta factura, Date fechaComprobante,
                                        int puntoVenta, int tipo, long numero) throws Exception {
         Cliente cliente = factura.getCliente();
-        int docTipo = cliente == null ? 99 : 80;
+        int docTipo = cliente == null ? 99 : cliente.getTipoDocumento().getCodigoAfip();
         long docNro = cliente == null ? 0 : Long.parseLong(digitos(cliente.getCuitCuil()));
         int condicionIva = factura.getCondicionIva().getCodigoAfip();
         String fecha = fechaComprobante.toInstant().atZone(ZoneId.systemDefault())

@@ -3,6 +3,8 @@ package com.example.demo.model;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -22,6 +24,11 @@ import lombok.Setter;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class Cliente extends AuditoriaApp {
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_documento", nullable = false, length = 4,
+            columnDefinition = "varchar(4) default 'CUIT'")
+    private TipoDocumento tipoDocumento = TipoDocumento.CUIT;
 
     @Column(nullable = false)
     private String cuitCuil;

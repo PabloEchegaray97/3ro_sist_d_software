@@ -57,7 +57,7 @@ export function App() {
     try {
       const loaded = await service.obtenerFacturas({
         ...filters,
-        estado: section === "pending" ? "SIN_EMITIR" : "EMITIDA",
+        estado: section === "pending" ? (filters.estado ?? "SIN_EMITIR") : "EMITIDA",
       });
       if (version !== invoiceRequestVersion.current) return;
       setInvoices(loaded);
@@ -172,7 +172,6 @@ export function App() {
     if (action === "view") setViewId(invoice.id);
     if (action === "edit") setFormMode(invoice.id);
     if (action === "emit") setEmitCandidate(invoice);
-    if (action === "annul") setPending({ action: "annul", invoice });
     if (action === "delete") setPending({ action: "delete", invoice });
   }, [emitInvoice]);
 
@@ -180,13 +179,12 @@ export function App() {
     if (!pending) return;
     setActionBusy(true);
     try {
-      if (pending.action === "annul") {
-        await service.anularFactura(pending.invoice.id);
-        sileo.success({ title: "Factura anulada", description: `Comprobante ${pending.invoice.numeroFactura ?? pending.invoice.id}` });
-      } else {
-        await service.eliminarFactura(pending.invoice.id);
-        sileo.success({ title: "Factura eliminada", description: `Borrador ${pending.invoice.numeroFactura ?? pending.invoice.id}` });
-      }
+      await service.eliminarFactura(pending.invoice.id);
+      const annulled = pending.invoice.estado.trim().toUpperCase() === "ANULADA";
+      sileo.success({
+        title: annulled ? "Factura anulada eliminada definitivamente" : "Factura eliminada",
+        description: `${annulled ? "Comprobante" : "Borrador"} ${pending.invoice.numeroFactura ?? pending.invoice.id}`,
+      });
       setPending(null);
       await loadInvoices();
     } catch (error) {
@@ -212,6 +210,10 @@ export function App() {
         arcaConfigurationError={arcaConfigurationError}
         onChange={changeSection}
         onInfo={() => setInfoOpen(true)}
+        onNewInvoice={() => {
+          changeSection("pending");
+          setFormMode("new");
+        }}
       />
       <main>
         {section === "clients" ? <ClientsView service={service} />
@@ -226,14 +228,24 @@ export function App() {
                 ? "Revisá tus facturas y validalas con ARCA cuando estén listas."
                 : "Comprobantes autorizados por ARCA con CAE asignado."}</p>
             </div>
-            <div><h1>Comprobantes registrados</h1><p>Consultá, editá, anulá o eliminá las facturas existentes.</p></div>
+            <div><h1>Comprobantes registrados</h1><p>Consultá, editá o eliminá las facturas existentes.</p></div>
             <div className="heading-actions">
+              {section === "pending" && (
+                <p className="invoice-list-state">
+                  Se muestran: {filters.estado === "ANULADA" ? "Anuladas" : "Sin emitir"}
+                </p>
+              )}
               <button type="button" onClick={() => setFiltersOpen(true)}><i className="ph ph-funnel" aria-hidden="true" /><span>Filtros</span></button>
               <button type="button" disabled={loading} onClick={() => void loadInvoices()}><i className="ph ph-arrow-clockwise" aria-hidden="true" /><span>Recargar</span></button>
               {section === "pending" && <button type="button" data-variant="primary" onClick={() => setFormMode("new")}><i className="ph ph-plus" aria-hidden="true" /><span>Nueva factura</span></button>}
             </div>
           </header>
-          <InvoiceTable invoices={invoices} loading={loading} onAction={handleAction} />
+          <InvoiceTable
+            invoices={invoices}
+            loading={loading}
+            dateMode={section === "pending" ? "creation" : "issuance"}
+            onAction={handleAction}
+          />
         </section>
         )}
       </main>
@@ -242,6 +254,7 @@ export function App() {
       <InvoiceFiltersModal
         open={filtersOpen}
         filters={filters}
+        allowStatusFilter={section === "pending"}
         onClose={() => setFiltersOpen(false)}
         onApply={(nextFilters) => {
           setFilters(nextFilters);

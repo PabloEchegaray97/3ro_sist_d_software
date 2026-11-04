@@ -18,17 +18,18 @@ export function CatalogView({ kind, service }: { kind: CatalogKind; service: Fac
   const [editing, setEditing] = useState<CatalogoItemDTO | null>(null);
   const [deleting, setDeleting] = useState<CatalogoItemDTO | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("ACTIVOS");
   const [refreshKey, setRefreshKey] = useState(0);
   const label = labels[kind];
   const columns = useMemo<ExplorerColumn<CatalogoItemDTO>[]>(() => [
     { header: "ID", render: (item) => item.id, searchValue: (item) => item.id },
     { header: "Código", render: (item) => item.codigo, searchValue: (item) => item.codigo },
-    { header: "Denominación", render: (item) => item.denominacion, searchValue: (item) => item.denominacion },
+    { header: "Denominación", render: (item) => <>{item.denominacion}{item.fechaBaja && <small>Eliminado el {dateTimeParts(item.fechaBaja).date}</small>}</>, searchValue: (item) => item.denominacion },
     { header: "Fecha de alta", render: (item) => dateTimeParts(item.fechaAlta).date, searchValue: (item) => item.fechaAlta },
   ], []);
   const loadPage = useCallback(
-    (search: string, page: number, size: number) => kind === "rubros" ? service.buscarRubros(search, page, size) : service.buscarMarcas(search, page, size),
-    [kind, service],
+    (search: string, page: number, size: number) => kind === "rubros" ? service.buscarRubros(search, page, size, statusFilter) : service.buscarMarcas(search, page, size, statusFilter),
+    [kind, service, statusFilter],
   );
 
   const closeForm = () => { setFormOpen(false); setEditing(null); };
@@ -66,8 +67,10 @@ export function CatalogView({ kind, service }: { kind: CatalogKind; service: Fac
       onAction={() => setFormOpen(true)}
       onEdit={setEditing}
       onDelete={setDeleting}
+      isItemInactive={(item) => item.fechaBaja != null}
       refreshKey={refreshKey}
       tableClassName="catalog-data-table"
+      controls={<select className="explorer-order-select" aria-label={`Estado de ${label.title.toLowerCase()}`} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="ACTIVOS">Activos</option><option value="ELIMINADOS">Eliminados</option></select>}
     />
     <CatalogFormModal open={formOpen || editing != null} kind={kind} item={editing} service={service} onClose={closeForm} onSaved={saved} />
     <DeactivateEntityModal open={deleting != null} entityType={label.singular} entityName={deleting?.denominacion ?? ""} busy={deleteBusy} onClose={() => { if (!deleteBusy) setDeleting(null); }} onConfirm={() => void confirmDelete()} />

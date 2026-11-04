@@ -99,6 +99,9 @@ public class FacturaTemplatePdfService {
         BigDecimal saldo = factura.getImporteSaldo() == null ? BigDecimal.ZERO : factura.getImporteSaldo();
         BigDecimal total = factura.getImporteTotal() == null ? BigDecimal.ZERO : factura.getImporteTotal();
         model.put("receiver", map(
+                "documentLabel", factura.getClienteId() == null
+                        ? "Documento"
+                        : valor(factura.getClienteTipoDocumento(), "CUIT/CUIL"),
                 "document", factura.getClienteId() == null ? "NR" : valor(factura.getClienteCuitCuil(), "NR"),
                 "name", factura.getClienteId() == null ? "Consumidor Final" : valor(factura.getClienteDenominacion(), "Consumidor Final"),
                 "ivaCondition", factura.getClienteId() == null
@@ -176,12 +179,17 @@ public class FacturaTemplatePdfService {
                 "\"importe\":" + factura.getImporteTotal().setScale(2, RoundingMode.HALF_UP).toPlainString() + "," +
                 "\"moneda\":\"" + factura.getTipoMonedaCodigo() + "\"," +
                 "\"ctz\":1," +
-                "\"tipoDocRec\":" + (factura.getClienteId() == null ? 99 : 80) + "," +
+                "\"tipoDocRec\":" + tipoDocumentoReceptor(factura) + "," +
                 "\"nroDocRec\":" + (factura.getClienteId() == null ? "0" : digitos(factura.getClienteCuitCuil())) + "," +
                 "\"tipoCodAut\":\"E\"," +
                 "\"codAut\":" + digitos(factura.getCae()) + "}";
         String payload = Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
         return "https://www.arca.gob.ar/fe/qr/?p=" + URLEncoder.encode(payload, StandardCharsets.UTF_8);
+    }
+
+    private int tipoDocumentoReceptor(FacturaVistaDTO factura) {
+        if (factura.getClienteId() == null) return 99;
+        return "CUIL".equalsIgnoreCase(factura.getClienteTipoDocumento()) ? 86 : 80;
     }
 
     private String qrDataUri(String contenido) throws Exception {

@@ -70,7 +70,8 @@ body { min-width: 320px; min-height: 100dvh; margin: 0; font-size: .9rem; }
   border: 0;
 }
 
-.app-shell button, .context-menu button {
+.app-shell button:not(:where([data-sileo-toast], [data-sileo-button])),
+.context-menu button {
   min-height: var(--button-height);
   padding: .35rem var(--button-padding-inline);
   border: 0;
@@ -85,9 +86,12 @@ body { min-width: 320px; min-height: 100dvh; margin: 0; font-size: .9rem; }
   cursor: pointer;
 }
 
-.app-shell button:hover, .context-menu button:hover { background: #eef0f6; }
-.app-shell button:disabled, .context-menu button:disabled { cursor: not-allowed; opacity: .48; }
-.app-shell button:focus-visible, .context-menu button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.app-shell button:not(:where([data-sileo-toast], [data-sileo-button])):hover,
+.context-menu button:hover { background: #eef0f6; }
+.app-shell button:not(:where([data-sileo-toast], [data-sileo-button])):disabled,
+.context-menu button:disabled { cursor: not-allowed; opacity: .48; }
+.app-shell button:not(:where([data-sileo-toast], [data-sileo-button])):focus-visible,
+.context-menu button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .app-shell button[data-variant="primary"] { color: #fff; background: var(--primary); }
 .app-shell button[data-variant="primary"]:hover { background: var(--primary-hover); }
 .app-shell button[data-variant="danger"] { color: #fff; background: var(--danger); }
@@ -255,6 +259,19 @@ body { min-width: 320px; min-height: 100dvh; margin: 0; font-size: .9rem; }
   color: #fff;
   background: rgb(255 255 255 / .09);
 }
+.app-shell .sidebar-new-invoice {
+  width: 100%;
+  min-height: 2.55rem;
+  padding-inline: var(--sidebar-item-padding-x);
+  color: var(--primary);
+  background: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.app-shell .sidebar-new-invoice:hover {
+  color: var(--primary-hover);
+  background: #f1f5f9;
+}
 .sidebar-environment {
   position: relative;
   min-height: 2rem;
@@ -418,6 +435,7 @@ main { width: 100%; min-height: 0; padding: 1rem; overflow: hidden; }
 .page-heading h1 { margin-bottom: .2rem; }
 .page-heading .section-heading-copy + div:not(.heading-actions) { display: none; }
 .heading-actions { display: flex; align-items: center; gap: .5rem; }
+.invoice-list-state { margin: 0 .25rem 0 0; color: var(--text-tertiary); line-height: 1.45; white-space: nowrap; }
 
 .table-shell { width: 100%; overflow-x: auto; border-radius: var(--radius-card); background: var(--surface-card); }
 table { width: 100%; border-collapse: collapse; font-size: .82rem; }
@@ -548,6 +566,8 @@ dialog::backdrop { background: var(--overlay); }
 .app-shell .dialog-heading .icon-button { color: var(--text-primary); background: transparent; }
 .app-shell .dialog-heading .icon-button:hover { background: var(--surface-2); }
 .confirmation-text { margin: .5rem 0 1rem; }
+.confirmation-dialog-content { padding-top: .35rem; display: grid; gap: 1.5rem; }
+.app-shell .confirmation-dialog-content .confirmation-text { margin: 0; color: var(--text-primary); }
 .dialog-actions, form > footer { display: flex; justify-content: center; gap: .5rem; }
 .emit-confirmation { display: grid; gap: 1rem; }
 .app-shell .emit-confirm-button { min-width: 13rem; padding: .35rem .45rem .35rem .75rem; gap: .7rem; }
@@ -829,7 +849,7 @@ input[readonly], select:disabled { color: var(--text-secondary); background: var
 .article-explorer-table th:nth-child(9) { width: 4%; }
 .article-explorer-table td { overflow-wrap: anywhere; }
 .article-explorer-shell { max-width: 100%; overflow-x: hidden; }
-.explorer-controls { flex: 0 0 auto; }
+.explorer-controls { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; gap: .5rem; }
 .explorer-order-select { width: auto; min-width: 12rem; height: 2.25rem; min-height: 2.25rem; border-radius: var(--radius-pill); padding-top: .4rem; padding-bottom: .4rem; }
 .explorer-pagination { margin-top: .85rem; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1rem; color: var(--text-secondary); font-size: .8rem; }
 .explorer-pagination > div { grid-column: 2; display: flex; align-items: center; gap: .65rem; }

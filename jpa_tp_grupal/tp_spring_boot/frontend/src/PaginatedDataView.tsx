@@ -30,12 +30,13 @@ interface PaginatedDataViewProps<T> {
   getItemLabel?: (item: T) => string;
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
+  isItemInactive?: (item: T) => boolean;
 }
 
 export function PaginatedDataView<T,>({
   title, description, searchPlaceholder, emptyText, columns, getKey, loadPage,
   actionLabel, actionIcon, onAction, controls, refreshKey = 0, tableClassName = "", pageSize = 10,
-  getItemLabel, onEdit, onDelete,
+  getItemLabel, onEdit, onDelete, isItemInactive,
 }: PaginatedDataViewProps<T>) {
   const [items, setItems] = useState<T[]>([]);
   const [searchDraft, setSearchDraft] = useState("");
@@ -50,7 +51,7 @@ export function PaginatedDataView<T,>({
   const hasRowActions = Boolean(getItemLabel && onEdit && onDelete);
 
   const openAt = (item: T, x: number, y: number) => {
-    if (!hasRowActions) return;
+    if (!hasRowActions || isItemInactive?.(item)) return;
     setRowMenu({
       item,
       x: Math.max(8, Math.min(x, window.innerWidth - 198)),
@@ -71,6 +72,7 @@ export function PaginatedDataView<T,>({
 
   const requestPage = async (term: string, requestedPage: number) => {
     const version = ++requestVersion.current;
+    setRowMenu(null);
     setLoading(true);
     try {
       const result = await loadPage(term, requestedPage, pageSize);
@@ -119,9 +121,9 @@ export function PaginatedDataView<T,>({
           <tbody>
             {loading && <tr><td colSpan={columns.length + (hasRowActions ? 1 : 0)} data-empty>Cargando…</td></tr>}
             {!loading && items.length === 0 && <tr><td colSpan={columns.length + (hasRowActions ? 1 : 0)} data-empty>{emptyText}</td></tr>}
-            {!loading && items.map((item) => <tr key={getKey(item)} onContextMenu={hasRowActions ? (event) => openFromRow(event, item) : undefined}>
+            {!loading && items.map((item) => <tr key={getKey(item)} data-inactive={isItemInactive?.(item) || undefined} onContextMenu={hasRowActions && !isItemInactive?.(item) ? (event) => openFromRow(event, item) : undefined}>
               {columns.map((column) => <td key={column.header} style={{ textAlign: column.align }}>{column.render(item)}</td>)}
-              {hasRowActions && <td className="row-menu-column"><IconButton type="button" icon="ph-dots-three-vertical" label={`Acciones de ${getItemLabel?.(item) ?? "registro"}`} aria-haspopup="menu" aria-expanded={rowMenu?.item === item} onClick={(event) => openFromButton(event, item)} /></td>}
+              {hasRowActions && <td className="row-menu-column">{!isItemInactive?.(item) && <IconButton type="button" icon="ph-dots-three-vertical" label={`Acciones de ${getItemLabel?.(item) ?? "registro"}`} aria-haspopup="menu" aria-expanded={rowMenu?.item === item} onClick={(event) => openFromButton(event, item)} />}</td>}
             </tr>)}
           </tbody>
         </table>

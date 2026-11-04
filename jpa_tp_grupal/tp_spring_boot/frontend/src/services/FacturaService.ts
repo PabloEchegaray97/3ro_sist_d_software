@@ -35,6 +35,7 @@ const facturaReporteShape = {
   id: "number",
   numeroFactura: "number",
   fechaEmision: "string",
+  fechaCreacionInterna: "string",
   clienteDenominacion: "string",
   condicionIva: "string",
   puntoVentaDescripcion: "string",
@@ -90,7 +91,7 @@ const facturaDetalleVistaFields = [
 
 const facturaVistaFields = [
   "id", "numero", "fechaEmision", "puntoVentaId", "puntoVentaNumero", "puntoVentaDescripcion",
-  "puntoVentaDomicilio", "tipoComprobante", "clienteId", "clienteDenominacion",
+  "puntoVentaDomicilio", "tipoComprobante", "clienteId", "clienteTipoDocumento", "clienteDenominacion",
   "clienteCuitCuil", "clienteTelefono", "clienteEmail", "clienteDomicilio",
   "listaPrecioId", "listaPrecioCodigo", "listaPrecio",
   "condicionIvaId", "condicionIva",
@@ -187,11 +188,13 @@ export class FacturaService {
     pagina: number,
     tamanio: number,
     listaPrecioId: number | null,
+    estado = "ACTIVOS",
   ): Promise<PaginaDTO<ArticuloDisponibleDTO>> {
     const parametros = new URLSearchParams({
       busqueda,
       pagina: String(pagina),
       tamanio: String(tamanio),
+      estado,
     });
     if (listaPrecioId != null) parametros.set("listaPrecioId", String(listaPrecioId));
     return this.solicitar<PaginaDTO<ArticuloDisponibleDTO>>(
@@ -204,12 +207,14 @@ export class FacturaService {
     pagina: number,
     tamanio: number,
     orden: string,
+    estado = "ACTIVOS",
   ): Promise<PaginaDTO<ClienteDisponibleDTO>> {
     const parametros = new URLSearchParams({
       busqueda,
       pagina: String(pagina),
       tamanio: String(tamanio),
       orden,
+      estado,
     });
     return this.solicitar<PaginaDTO<ClienteDisponibleDTO>>(
       `${this.datosMaestrosUrl}/clientes-disponibles?${parametros.toString()}`,
@@ -295,16 +300,18 @@ export class FacturaService {
     busqueda: string,
     pagina: number,
     tamanio: number,
+    estado = "ACTIVOS",
   ): Promise<PaginaDTO<CatalogoItemDTO>> {
-    return this.buscarCatalogo("rubros", busqueda, pagina, tamanio);
+    return this.buscarCatalogo("rubros", busqueda, pagina, tamanio, estado);
   }
 
   async buscarMarcas(
     busqueda: string,
     pagina: number,
     tamanio: number,
+    estado = "ACTIVOS",
   ): Promise<PaginaDTO<CatalogoItemDTO>> {
-    return this.buscarCatalogo("marcas", busqueda, pagina, tamanio);
+    return this.buscarCatalogo("marcas", busqueda, pagina, tamanio, estado);
   }
 
   async crearRubro(request: RubroRequestDTO): Promise<EntidadCreadaDTO> {
@@ -365,10 +372,6 @@ export class FacturaService {
     return this.solicitar<ArcaEmisionDTO>(`${this.url}/${id}/emitir`, { method: "POST" });
   }
 
-  async anularFactura(id: number): Promise<FacturaReporteDTO> {
-    return facturaReporteDTO(await this.solicitar<unknown>(`${this.url}/${id}/anular`, { method: "POST" }));
-  }
-
   async obtenerConfiguracionArca(): Promise<ArcaConfiguracionDTO> {
     return this.solicitar<ArcaConfiguracionDTO>(`${this.url}/arca/configuracion`);
   }
@@ -392,11 +395,13 @@ export class FacturaService {
     busqueda: string,
     pagina: number,
     tamanio: number,
+    estado: string,
   ): Promise<PaginaDTO<CatalogoItemDTO>> {
     const parametros = new URLSearchParams({
       busqueda,
       pagina: String(pagina),
       tamanio: String(tamanio),
+      estado,
     });
     return this.solicitar<PaginaDTO<CatalogoItemDTO>>(
       `${this.datosMaestrosUrl}/${recurso}?${parametros.toString()}`,

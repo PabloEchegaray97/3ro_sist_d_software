@@ -41,9 +41,10 @@ public class DatosMaestrosRestController {
             @RequestParam(defaultValue = "") String busqueda,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "8") int tamanio,
-            @RequestParam(required = false) Long listaPrecioId
+            @RequestParam(required = false) Long listaPrecioId,
+            @RequestParam(defaultValue = "ACTIVOS") String estado
     ) {
-        return service.buscarArticulosDisponibles(busqueda, pagina, tamanio, listaPrecioId);
+        return service.buscarArticulosDisponibles(busqueda, pagina, tamanio, listaPrecioId, estado);
     }
 
     @GetMapping("/clientes-disponibles")
@@ -51,9 +52,10 @@ public class DatosMaestrosRestController {
             @RequestParam(defaultValue = "") String busqueda,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "8") int tamanio,
-            @RequestParam(defaultValue = "ULTIMOS_AGREGADOS") String orden
+            @RequestParam(defaultValue = "ULTIMOS_AGREGADOS") String orden,
+            @RequestParam(defaultValue = "ACTIVOS") String estado
     ) {
-        return service.buscarClientesDisponibles(busqueda, pagina, tamanio, orden);
+        return service.buscarClientesDisponibles(busqueda, pagina, tamanio, orden, estado);
     }
 
     @GetMapping("/opciones-factura")
@@ -142,9 +144,10 @@ public class DatosMaestrosRestController {
     public PaginaDTO<CatalogoItemDTO> buscarRubros(
             @RequestParam(defaultValue = "") String busqueda,
             @RequestParam(defaultValue = "0") int pagina,
-            @RequestParam(defaultValue = "10") int tamanio
+            @RequestParam(defaultValue = "10") int tamanio,
+            @RequestParam(defaultValue = "ACTIVOS") String estado
     ) {
-        return service.buscarRubros(busqueda, pagina, tamanio);
+        return service.buscarRubros(busqueda, pagina, tamanio, estado);
     }
 
     @PutMapping("/rubros/{rubroId}")
@@ -175,9 +178,10 @@ public class DatosMaestrosRestController {
     public PaginaDTO<CatalogoItemDTO> buscarMarcas(
             @RequestParam(defaultValue = "") String busqueda,
             @RequestParam(defaultValue = "0") int pagina,
-            @RequestParam(defaultValue = "10") int tamanio
+            @RequestParam(defaultValue = "10") int tamanio,
+            @RequestParam(defaultValue = "ACTIVOS") String estado
     ) {
-        return service.buscarMarcas(busqueda, pagina, tamanio);
+        return service.buscarMarcas(busqueda, pagina, tamanio, estado);
     }
 
     @PutMapping("/marcas/{marcaId}")

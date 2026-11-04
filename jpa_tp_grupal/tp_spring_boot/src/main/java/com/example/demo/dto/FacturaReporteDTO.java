@@ -22,6 +22,10 @@ public class FacturaReporteDTO {
     private Long numeroFactura;
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private Date fechaEmision;
+    // Fecha operativa interna. Reutiliza fechaAlta de AuditoriaApp y no
+    // representa la fecha fiscal que ARCA asigna al emitir.
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private Date fechaCreacionInterna;
     private String clienteDenominacion;
     private String condicionIva;
     private String puntoVentaDescripcion;

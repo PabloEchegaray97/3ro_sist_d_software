@@ -14,16 +14,18 @@ interface MenuState {
 interface InvoiceTableProps {
   invoices: FacturaReporteDTO[];
   loading: boolean;
+  dateMode: "creation" | "issuance";
   onAction: (action: InvoiceAction, invoice: FacturaReporteDTO) => void;
 }
 
-export function InvoiceTable({ invoices, loading, onAction }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, loading, dateMode, onAction }: InvoiceTableProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
 
   const openAt = (invoice: FacturaReporteDTO, x: number, y: number) => {
     const menuWidth = 190;
-    const menuHeight = invoice.estado.trim().toUpperCase() === "SIN_EMITIR" ? 184 : 108;
+    const status = invoice.estado.trim().toUpperCase();
+    const menuHeight = status === "SIN_EMITIR" ? 184 : status === "ANULADA" ? 146 : 108;
     setMenu({
       invoice,
       x: Math.max(8, Math.min(x, window.innerWidth - menuWidth - 8)),
@@ -47,7 +49,7 @@ export function InvoiceTable({ invoices, loading, onAction }: InvoiceTableProps)
       <table className="facturas-table">
         <thead>
           <tr>
-            <th>ID</th><th>Número</th><th>Fecha</th><th>Cliente</th><th>Condición IVA</th>
+            <th>ID</th><th>Número</th><th>{dateMode === "creation" ? "Creación interna" : "Emisión"}</th><th>Cliente</th><th>Condición IVA</th>
             <th>Punto de venta</th><th>Total</th><th>Ítems</th><th>Estado</th>
             <th className="row-menu-column"><span className="sr-only">Menú</span></th>
           </tr>
@@ -59,7 +61,9 @@ export function InvoiceTable({ invoices, loading, onAction }: InvoiceTableProps)
           )}
           {!loading && invoices.map((invoice) => {
             const status = invoice.estado.trim().toUpperCase();
-            const date = dateTimeParts(invoice.fechaEmision);
+            const date = dateTimeParts(
+              dateMode === "creation" ? invoice.fechaCreacionInterna : invoice.fechaEmision,
+            );
             return (
               <tr
                 key={invoice.id}
@@ -82,7 +86,7 @@ export function InvoiceTable({ invoices, loading, onAction }: InvoiceTableProps)
                 <td>{invoice.puntoVentaDescripcion}</td>
                 <td data-money>{money(invoice.importeTotal)}</td>
                 <td>{invoice.cantidadItems}</td>
-                <td data-status={status === "SIN_EMITIR" ? "pendiente" : "emitida"}>{formatStatus(invoice.estado).replace("_", " ")}</td>
+                <td data-status={status === "SIN_EMITIR" ? "pendiente" : status === "ANULADA" ? "anulada" : "emitida"}>{formatStatus(invoice.estado).replace("_", " ")}</td>
                 <td className="row-menu-column">
                   <IconButton
                     type="button"
